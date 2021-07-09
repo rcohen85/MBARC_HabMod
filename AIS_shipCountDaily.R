@@ -20,6 +20,7 @@
 #--------------------------------------------
 install.packages('swfscMisc')
 library('swfscMisc')
+install.package('dplyr')
 library(dplyr)
 install.packages('geosphere')
 library('geosphere')
@@ -116,4 +117,12 @@ uVesselDay$shipTypeDetail[is.na(uVesselDay$shipTypeDetail)] = "Other"
 
 
 dailyshipCount_Type = uVesselDay %>% count(DayDate, shipTypeDetail)
+
+plot2 = ggplot(dailyshipCount_Type, aes(x = DayDate, y = n, fill = shipTypeDetail))+
+  geom_col(position = position_dodge2(width = 0.9, preserve = "single"), size = 5)+
+  xlab('Date')+
+  ylab('Count')+
+  guides(fill=guide_legend(title="Ship Type"))
+
+plot2
 
