@@ -87,4 +87,33 @@ dfRad$DayDate = as.POSIXct(dfRad$BaseDateTime)
 
 uVesselDay = distinct(dfRad, MMSI, DayDate, .keep_all = TRUE)
 
+uVesselDay$shipTypeDetail = NA
+
+uVesselDay$shipTypeDetail = with(uVesselDay,
+                                 ifelse(VesselType == 0, "Other",
+                                 ifelse(VesselType == 30, "Fishing",
+                                 ifelse(VesselType >30 & VesselType < 33, "Tug",
+                                 ifelse(VesselType == 35, "Military",
+                                 ifelse(VesselType > 35 & VesselType < 38, "Pleasure",
+                                 ifelse(VesselType == 52, "Tug",
+                                 ifelse(VesselType > 59 & VesselType < 70, "Passenger",
+                                 ifelse(VesselType > 69 & VesselType < 80, "Cargo",
+                                 ifelse(VesselType > 79 & VesselType < 90, "Tanker",
+                                 ifelse(VesselType >1000 & VesselType < 1003, "Fishing",
+                                 ifelse(VesselType > 1002 & VesselType < 1005, "Cargo",
+                                 ifelse(VesselType > 1011 & VesselType < 1016, "Passenger",
+                                 ifelse(VesselType == 1016, "Cargo",
+                                 ifelse(VesselType == 1017, "Tanker",
+                                 ifelse(VesselType == 1019, "Pleasure",
+                                 ifelse(VesselType == 1021, "Military",
+                                 ifelse(VesselType == 1023, "Tug",
+                                 ifelse(VesselType == 1024, "Tanker",
+                                 ifelse(VesselType == 1025, "Tug",
+                                 ifelse(is.na(VesselType), "Other",
+                                 ifelse(VesselType == 1022, "Other", "Other"))))))))))))))))))))))
+uVesselDay$shipTypeDetail[is.na(uVesselDay$shipTypeDetail)] = "Other"
+
+
+
+dailyshipCount_Type = uVesselDay %>% count(DayDate, shipTypeDetail)
 
