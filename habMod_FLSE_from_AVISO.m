@@ -10,8 +10,8 @@ outfolder = 'H:\AVISO_FLSEdata'; %will change current directory to this folder s
 years = {'2005','2006','2007','2008','2009','2010','2011','2012','2013',...
     '2014','2015','2016','2017','2018','2019','2020'};
 
-username = 'mziegenh@ucsd.edu'; %username and password below used to authenticate connection to ftp
-pw = '28n1Kt';
+username = ''; %username and password below used to authenticate connection to ftp
+pw = '';
 
 %use mget to download files into your folder
 for iy = 1:size(years,2)
