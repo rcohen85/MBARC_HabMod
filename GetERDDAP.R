@@ -134,3 +134,4 @@ p = ggplot(
   scale_fill_gradientn(colours = rev(rainbow(12)), na.value = NA, limits=c(-2,3)) +
   ggtitle(paste("Average Chlorophyll")
   ) 
+p
