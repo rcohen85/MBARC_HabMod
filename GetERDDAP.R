@@ -24,6 +24,8 @@ library(oce)
 #simple search
 SSH.dataset = ed_search(query='SSH') #sea surface height anomaly data sets
 SST.dataset = ed_search(query= 'SST')
+#another simple search
+info("erdMH1chlamday")
 #advanced search
 Upwelling.dataset = ed_search_adv(query = 'upwelling', maxLat = 63, minLon = -107, maxLon = -87, minLat = 50,
                       minTime = "2010-01-01T00:00:00Z",
@@ -232,20 +234,40 @@ aviso = SSH.tb %>%
             v.tb %>% select(v))
 
 #Visualizing the data
+#sea surface height anomaly
 library(metR)
 library(spData)
 ggplot()+
   metR::geom_contour_fill(data = ssh.in, aes(x = lon, y = lat, z = ssh))+
   metR::geom_contour2(data = ssh.in, aes(x = lon, y = lat, z = ssh))+
   metR::geom_text_contour(data = ssh.in, aes(x = lon, y = lat, z = ssh), 
-                          parse = TRUE, check_overlap = TRUE, size = 3.2)+
+                           check_overlap = TRUE, size = 3.2)+
   geom_sf(data = spData::world, fill = "grey60", col = "grey20")+
-  coord_sf(xlim = c(39,49.5), ylim = c(-14.5,-8))+
+  coord_sf(xlim = c(min(ssh.in$lon),max(ssh.in$lon)), ylim = c(min(ssh.in$lat),max(ssh.in$lat)))+
   theme(legend.position = "none")+
   labs(x = NULL, y = NULL)+
   scale_fill_gradientn(name = "ssh (m)",colours = oce::oceColors9A(120), na.value = "white")+
-  scale_x_continuous(breaks = seq(39.5, 49.5, length.out = 4) %>%round(1))+
-  scale_y_continuous(breaks = seq(-14,-8, 2))+
+  scale_x_continuous(breaks = seq(min(ssh.in$lon),max(ssh.in$lon), length.out = 4) %>%round(1))+
+  scale_y_continuous(breaks = seq(min(ssh.in$lat),max(ssh.in$lat), 2))+
+  guides(fill = guide_colorbar(title = "Sea surface height (m)", 
+                               title.position = "right", title.theme = element_text(angle = 90), 
+                               barwidth = 1.25, barheight = 10, draw.ulim = 1.2, draw.llim = 0.6))+
+  theme_bw()+
+  theme(axis.text = element_text(colour = 1, size = 11))
+
+#geostrophic currents speed and direction on top of sea surface height
+ggplot()+
+  metR::geom_contour_fill(data = ssh.in, aes(x = lon, y = lat, z = ssh), bins = 120)+
+  metR::geom_vector(data = aviso, aes(x = lon, y = lat, dx = u, dy = v),
+                    arrow.angle = 25, arrow.length = .4, arrow.type = "open")+
+  metR::scale_mag(max = .75, name = "Speed", labels = ".75 m/s")+
+  geom_sf(data = spData::world, fill = "grey60", col = "grey20")+
+  coord_sf(xlim = c(min(ssh.in$lon),max(ssh.in$lon)), ylim = c(min(ssh.in$lat),max(ssh.in$lat)))+
+  # theme(legend.position = "none")+
+  labs(x = NULL, y = NULL)+
+  scale_fill_gradientn(name = "ssh (m)",colours = oce::oceColors9A(120), na.value = "white")+
+  scale_x_continuous(breaks = seq(min(ssh.in$lon),max(ssh.in$lon), length.out = 4) %>%round(1))+
+  scale_y_continuous(breaks = seq(min(ssh.in$lat),max(ssh.in$lat), 2))+
   guides(fill = guide_colorbar(title = "Sea surface height (m)", 
                                title.position = "right", title.theme = element_text(angle = 90), 
                                barwidth = 1.25, barheight = 10, draw.ulim = 1.2, draw.llim = 0.6))+
