@@ -3,12 +3,12 @@
 # Script will loop through every combination of input area(s) and period(s). Requested 
 # variables are downloaded individually. Must have pracma and curl packages installed.
 
-# Global data are available from 1994-01-01 through 2020-02-18; covariates available
-# are: surf_el, salinity, water_temp, water_u, water_v, salinity_bottom, 
+# Global data are available from 1994-01-01 through 2020-02-18; resolution is 1/12 degree;
+# covariates available are: surf_el, salinity, water_temp, water_u, water_v, salinity_bottom, 
 # water_temp_bottom, water_u_bottom, water_v_bottom
 
-# GoM data are available from 1993-01-01 though 2021-07-15; covariates available
-# are: surf_el, salinity, water_temp, water_u, water_v
+# GoM data are available from 1993-01-01 though 2021-07-15; resolution is 1/25 degree; 
+# covariates available are: surf_el, salinity, water_temp, water_u, water_v
 
 # salinity, water_temp, water_u, water_v are all available at 40 depths (vertical levels)
 # Available depths are: 0.0 2.0 4.0 6.0 8.0 10.0 12.0 15.0 20.0 25.0 30.0
