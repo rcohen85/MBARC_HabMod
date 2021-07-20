@@ -123,14 +123,15 @@ for (i in 1:length(dateS)) # for each set of dates
   for (k in 1:length(latS)) # for each study area
   {
   
-    for (l in 1:length(covars)){
+    for (l in 1:length(covars)){ # for each covariate
+      
       # Determine which experiment(s) to pull data from based on desired region & date range
       if (strcmp(region,"global")){
         q <- which(dateS[i] >= global_expts$start)
         r <- which(dateE[i] <= global_expts$end)
         idxRange <- c(tail(q,1):r[1])
         url <- global_expts$url[idxRange]
-        dateSubsetStarts <- global_expts$start[idxRange]
+        dateSubsetStarts <- global_expts$start[idxRange] # subset date ranges by experiment
         dateSubsetEnds <- global_expts$end[idxRange]
         dateSubsetStarts[1] <- dateS[i]
         dateSubsetEnds[length(dateSubsetEnds)] <- dateE[i]
