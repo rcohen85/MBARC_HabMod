@@ -14,6 +14,23 @@ library(plotdap)
 library(reshape2)
 library(data.table)
 library(mapdata)
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+library(oce)
+
+#### Data exploration ####
+#You can search publicaly available data from ERDDAP by variable or time frame of interest
+#simple search
+SSH.dataset = ed_search(query='SSH') #sea surface height anomaly data sets
+SST.dataset = ed_search(query= 'SST')
+#another simple search
+info("erdMH1chlamday")
+#advanced search
+Upwelling.dataset = ed_search_adv(query = 'upwelling', maxLat = 63, minLon = -107, maxLon = -87, minLat = 50,
+                      minTime = "2010-01-01T00:00:00Z",
+                      maxTime="2010-02-01T00:00:00Z")
+
 
 #### User Defined parameters ####
 #Define spatial scale of interest
@@ -36,7 +53,6 @@ myFunc = function(x) log(x) #function for plotting in log
 
 #Extracting data and plotting a single time period
 #Using the VIIRSN data as an example - https://coastwatch.pfeg.noaa.gov/erddap/griddap/erdVH3chlamday.graph
-require("rerddapXtracto")
 ChlInfo = rerddap::info('erdVH3chlamday')
 parameter = 'chla'
 sanctchl = rxtractogon(ChlInfo, parameter = parameter, xcoord = xpos, ycoord = ypos,  tcoord = tpos) #extracts the data as a time series
@@ -134,3 +150,126 @@ p = ggplot(
   scale_fill_gradientn(colours = rev(rainbow(12)), na.value = NA, limits=c(-2,3)) +
   ggtitle(paste("Average Chlorophyll")
   ) 
+p
+
+#### Access, Download, Process and VIsualize sea surface height and geostrophic current from AVISO ####
+tpos = c("2017-04-15","2020-04-15")
+SSHInfo = rerddap::info('nesdisSSH1day')
+
+#Get u_current
+u = rxtracto_3D(SSHInfo,parameter="ugos",
+                tcoord=tpos,
+                xcoord=xpos,ycoord=ypos)
+u %>% glimpse()
+
+lon = u$longitude
+lat = u$latitude
+time = u$time %>%as.Date()
+u.data = u$ugos 
+
+## obtain dimension
+dimension = data.frame(lon, u.data[,,1]) %>% dim()
+
+## convert the array into data frame
+u.tb = data.frame(lon, u.data[,,1]) %>% 
+  as_tibble() %>% 
+  gather(key = "lati", value = "u", 2:dimension[2]) %>% 
+  mutate(lat = rep(lat, each = dimension[1]), time = time[1]) %>% 
+  select(lon,lat, time, u)
+
+#Get v_current
+v = rxtracto_3D(SSHInfo,parameter="vgos",
+                tcoord=tpos,
+                xcoord=xpos,ycoord=ypos)
+v %>% glimpse()
+
+lon = v$longitude
+lat = v$latitude
+time = v$time %>%as.Date()
+v.data = v$vgos 
+
+## obtain dimension
+dimension = data.frame(lon, v.data[,,1]) %>% dim()
+
+## convert the array into data frame
+v.tb = data.frame(lon, v.data[,,1]) %>% 
+  as_tibble() %>% 
+  gather(key = "lati", value = "v", 2:dimension[2]) %>% 
+  mutate(lat = rep(lat, each = dimension[1]), time = time[1]) %>% 
+  select(lon,lat, time, v)
+
+#Get SSH
+SSH = rxtracto_3D(SSHInfo,parameter = "sla",
+                tcoord=tpos,
+                xcoord=xpos,ycoord=ypos)
+SSH %>% glimpse()
+
+lon = SSH$longitude
+lat = SSH$latitude
+time = SSH$time %>%as.Date()
+SSH.data = SSH$sla 
+
+## obtain dimension
+dimension = data.frame(lon, SSH.data[,,1]) %>% dim()
+
+## convert the array into data frame
+SSH.tb = data.frame(lon, SSH.data[,,1]) %>% 
+  as_tibble() %>% 
+  gather(key = "lati", value = "SSH", 2:dimension[2]) %>% 
+  mutate(lat = rep(lat, each = dimension[1]), time = time[1]) %>% 
+  select(lon,lat, time, SSH)
+
+ssh.in = oce::interpBarnes(x = SSH.tb$lon, y = SSH.tb$lat, z = SSH.tb$SSH)
+dimension = data.frame(lon = ssh.in$xg, ssh.in$zg) %>% dim()
+
+ssh.in = data.frame(lon = ssh.in$xg, ssh.in$zg) %>% 
+  as_tibble() %>% 
+  gather(key = "lati", value = "ssh", 2:dimension[2]) %>% 
+  mutate(lat = rep(ssh.in$yg, each = dimension[1]), time = time[1]) %>% 
+  select(lon,lat, time, ssh)
+
+#combine dataframes into tibble
+aviso = SSH.tb %>% 
+  bind_cols(u.tb %>%select(u),
+            v.tb %>% select(v))
+
+#Visualizing the data
+#sea surface height anomaly
+library(metR)
+library(spData)
+ggplot()+
+  metR::geom_contour_fill(data = ssh.in, aes(x = lon, y = lat, z = ssh))+
+  metR::geom_contour2(data = ssh.in, aes(x = lon, y = lat, z = ssh))+
+  metR::geom_text_contour(data = ssh.in, aes(x = lon, y = lat, z = ssh), 
+                           check_overlap = TRUE, size = 3.2)+
+  geom_sf(data = spData::world, fill = "grey60", col = "grey20")+
+  coord_sf(xlim = c(min(ssh.in$lon),max(ssh.in$lon)), ylim = c(min(ssh.in$lat),max(ssh.in$lat)))+
+  theme(legend.position = "none")+
+  labs(x = NULL, y = NULL)+
+  scale_fill_gradientn(name = "ssh (m)",colours = oce::oceColors9A(120), na.value = "white")+
+  scale_x_continuous(breaks = seq(min(ssh.in$lon),max(ssh.in$lon), length.out = 4) %>%round(1))+
+  scale_y_continuous(breaks = seq(min(ssh.in$lat),max(ssh.in$lat), 2))+
+  guides(fill = guide_colorbar(title = "Sea surface height (m)", 
+                               title.position = "right", title.theme = element_text(angle = 90), 
+                               barwidth = 1.25, barheight = 10, draw.ulim = 1.2, draw.llim = 0.6))+
+  theme_bw()+
+  theme(axis.text = element_text(colour = 1, size = 11))
+
+#geostrophic currents speed and direction on top of sea surface height
+ggplot()+
+  metR::geom_contour_fill(data = ssh.in, aes(x = lon, y = lat, z = ssh), bins = 120)+
+  metR::geom_vector(data = aviso, aes(x = lon, y = lat, dx = u, dy = v),
+                    arrow.angle = 25, arrow.length = .4, arrow.type = "open")+
+  metR::scale_mag(max = .75, name = "Speed", labels = ".75 m/s")+
+  geom_sf(data = spData::world, fill = "grey60", col = "grey20")+
+  coord_sf(xlim = c(min(ssh.in$lon),max(ssh.in$lon)), ylim = c(min(ssh.in$lat),max(ssh.in$lat)))+
+  # theme(legend.position = "none")+
+  labs(x = NULL, y = NULL)+
+  scale_fill_gradientn(name = "ssh (m)",colours = oce::oceColors9A(120), na.value = "white")+
+  scale_x_continuous(breaks = seq(min(ssh.in$lon),max(ssh.in$lon), length.out = 4) %>%round(1))+
+  scale_y_continuous(breaks = seq(min(ssh.in$lat),max(ssh.in$lat), 2))+
+  guides(fill = guide_colorbar(title = "Sea surface height (m)", 
+                               title.position = "right", title.theme = element_text(angle = 90), 
+                               barwidth = 1.25, barheight = 10, draw.ulim = 1.2, draw.llim = 0.6))+
+  theme_bw()+
+  theme(axis.text = element_text(colour = 1, size = 11))
