@@ -203,7 +203,7 @@ model2 = gam(CallingHours~ s(avg_sss_per_day), data = masterdf)
 AIC(model1)
 AIC(model2)
 summary(model2)
-
+test
 
 #---------------------------------full ADDITIVE model
 modelfull = gam(CallingHours ~ s(avg_chlora_per_day) + s(avg_sst_per_day), data = masterdf)
