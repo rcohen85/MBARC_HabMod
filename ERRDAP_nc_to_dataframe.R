@@ -1,5 +1,8 @@
-setwd("G:/Shared drives/Ashley Adornato/")
-getwd()
+# Wrangling ERRDAP data and combinging with response variable data
+#
+# Vanessa ZoBel and Ashley Adornato, Aug 6, 2021
+
+## PACKAGES
 install.packages("ncdf4")
 library(ncdf4)
 install.packages("lubridate")
@@ -8,6 +11,8 @@ library(dplyr)
 library(gam)
 library(mgcv)
 library(mgcViz)
+
+## FUNCTIONS
 daysFromDate <- function(data1, data2="1970-01-01")
 {
   round(as.numeric(difftime(data1,data2,units = "secs")))
@@ -27,6 +32,9 @@ matlab2POS = function(x, timez = "UTC") {
                              tz = 'UTC', usetz = FALSE), tz = timez))
 }
 
+
+## Loading in .nc files downloaded from ERRDAP
+setwd("G:/Shared drives/Ashley Adornato/")
 sst2008_2012 <- nc_open('SSTjan2008_to_dec2012.nc')
 chloa2008_2012 <- nc_open('CHLOAjan2008_to_dec2012.nc')
 sss2011_2012 <- nc_open('SSSaug2011_to_dec2012.nc')
@@ -34,27 +42,27 @@ print(sst2008_2012)
 
 
 
-# --------------------------------- SST
+## --------------------------------- Sea surface temperature
 
-#pulling out lat, time, and lon variables for sst from .nc file
+## pulling out lat, lon, and time variables for sst from .nc file
 lon <- ncvar_get(sst2008_2012, "longitude")
 lat <- ncvar_get(sst2008_2012, "latitude")
 time <- ncvar_get(sst2008_2012, "time")
 
 
-#filtering (indexing) for data within specific lat and lon bounds
+## indexing for data within specific lat and lon bounds
 lonIdx <- which( lon >= -121 & lon <= -117)
 latIdx <- which( lat >= 31.5 & lat <= 35.5)
 
-#filtering (indexing) for data within specific time bounds
+## indexing for data within specific time bounds
 myTime <- c(daysFromDate("2009-11-03"), daysFromDate("2012-12-31"))
 timeIdx <- which(time >= myTime[1] & time <= myTime[2])
 
-#pulling out sstdata from indexed lat,lon, and time
+## pulling out sstdata from from lat, lon, and time indices
 data <- ncvar_get(sst2008_2012, "sst")[lonIdx, latIdx, timeIdx]
 
 
-#pulling out lat, long, time data from indeces
+## pulling out lat, long, time data from indices
 indices <- expand.grid(lon[lonIdx], lat[latIdx], time[timeIdx])
 print(length(indices))
 class(indices)
@@ -62,59 +70,64 @@ summary(indices)
 str(indices)
 
 
-#binding together sst, lat, long, and time
+## combining sst, lat, long, and time and converting to a dataframe
 dfsst <- data.frame(cbind(indices, as.vector(data)))
 summary(df)
 str(df)
 
 
-#converting date to a different format of date
+## converting date to usable format of date
 dfsst$date = as.character(as.Date(format(as.POSIXct(dfsst$Var3, origin =   "1970-01-01",tz = "GMT"), format = '%Y-%m-%d')))
 
-#getting rid of n/a
+## getting rid of n/a
 dfsst = na.omit(dfsst)
 
 
-#taking the mean daily sst
+## averaging sst per day for mean daily values
 sstday <- dfsst %>%
   group_by(date) %>%
   summarize(avg_sst_per_day = mean(as.vector.data.))
 
 
-# ------------------------------------ CHLORA
+## ------------------------------------ Chlorophyll-a
+
+## pulling out lat, lon, and time variables for sst from .nc file
 lon <- ncvar_get(chloa2008_2012, "longitude")
 lat <- ncvar_get(chloa2008_2012, "latitude")
 time <- ncvar_get(chloa2008_2012, "time")
 
-
-
+## indexing for data within specific lat and lon bounds
 lonIdx <- which( lon >= -121 & lon <= -117)
 latIdx <- which( lat >= 31.5 & lat <= 35.5)
 
+## indexing for data within specific time bounds
 myTime <- c(daysFromDate("2009-11-03"), daysFromDate("2012-12-31"))
 timeIdx <- which(time >= myTime[1] & time <= myTime[2])
 
+## pulling out sst data from from lat, lon, and time indices
 data <- ncvar_get(chloa2008_2012, "chlorophyll")[lonIdx, latIdx, timeIdx]
 
+## pulling out lat, long, time data from indices
 indices <- expand.grid(lon[lonIdx], lat[latIdx], time[timeIdx])
 print(length(indices))
 class(indices)
 summary(indices)
 str(indices)
 
-
-
+## combining sst, lat, long, and time and converting to a dataframe
 dfchlora <- data.frame(cbind(indices, as.vector(data)))
 summary(df)
 str(df)
 format = "%Y-%m-%d"
+
+## converting date to usable format of date
 dfchlora$date = as.character(as.Date(format(as.POSIXct(dfchlora$Var3, origin =   "1970-01-01",tz = "GMT"), format = '%Y-%m-%d')))
 
-#getting rid of n/a
+## getting rid of n/a
 dfchlora = na.omit(dfchlora)
 
 
-#taking the mean daily chlorA
+## averaging sst per day for mean daily values
 chloraday <- dfchlora %>%
   group_by(date) %>%
   summarize(avg_chlora_per_day = mean(as.vector.data.))
@@ -134,14 +147,16 @@ lat <- ncvar_get(sss2011_2012, "latitude")
 time <- ncvar_get(sss2011_2012, "time")
 
 
-
 lonIdx <- which( lon >= -121 & lon <= -117)
 latIdx <- which( lat >= 31.5 & lat <= 35.5)
+
 
 myTime <- c(daysFromDate("2009-11-03"), daysFromDate("2012-12-31"))
 timeIdx <- which(time >= myTime[1] & time <= myTime[2])
 
+
 data <- ncvar_get(sss2011_2012, "sss")[lonIdx, latIdx, timeIdx]
+
 
 indices <- expand.grid(lon[lonIdx], lat[latIdx], time[timeIdx])
 print(length(indices))
@@ -150,35 +165,41 @@ summary(indices)
 str(indices)
 
 
-
 dfsss <- data.frame(cbind(indices, as.vector(data)))
 summary(df)
 str(df)
 
+
 dfsss$date = as.character(as.Date(as.POSIXct(dfsss$Var3,origin = "1970-01-01",tz = "GMT")))
+
+
 
 dfsss = na.omit(dfsss)
 sssday <- dfsss %>%
   group_by(date) %>%
   summarize(avg_sss_per_day = mean(as.vector.data.))
 
-#------------------------------------------------------------
-#combine all data
+## -------------------------------------------- RESPONSE VARIABLE SET UP
+## Reading in response variable (humpback calling hours per day)
 humpbackdata = read.csv('G:/My Drive/Mentoring/Ashley Adornato/migration data analysis/HumpbackDetectionsHabitatModel.csv')
+
+# formating matlab datenum to character string
 humpbackdata$date = as.character(as.Date(matlab2POS(humpbackdata$datenum)))
 
+
+## -------------------------------------------- Combining data for master dataframe
 masterdf = left_join(humpbackdata, chloraday, by = 'date')
 masterdf = left_join(masterdf, sstday, by = 'date')
 masterdf = left_join(masterdf, sssday, by = 'date')
 
 
-#--------------------------------------------------------
-#gam
+#---------------------------------------------- Preliminary GAM tests
 
+# Null Model
 nullModel = gam(CallingHours~1, data = masterdf)
 AIC(nullModel)
 
-# ------------ chlora test and smooth chlora test
+## chlor-a linear model and smooth model
 model1 = gam(CallingHours ~ avg_chlora_per_day, data = masterdf)
 model2 = gam(CallingHours~ s(avg_chlora_per_day), data = masterdf)
 AIC(model1)
@@ -189,7 +210,7 @@ b = getViz(model2)
 print(plot(b, allTerms = T), pages = 1)
 
 
-#--------------------sst test and smooth sst test
+## sst linear model and smooth model
 model1 = gam(CallingHours ~ avg_sst_per_day, data = masterdf)
 model2 = gam(CallingHours~ s(avg_sst_per_day), data = masterdf)
 AIC(model1)
@@ -197,7 +218,7 @@ AIC(model2)
 summary(model2)
 
 
-#--------------------------------sss test and smooth sss test
+## sss linear model and smooth model
 model1 = gam(CallingHours ~ avg_sss_per_day, data = masterdf)
 model2 = gam(CallingHours~ s(avg_sss_per_day), data = masterdf)
 AIC(model1)
@@ -205,7 +226,7 @@ AIC(model2)
 summary(model2)
 test
 
-#---------------------------------full ADDITIVE model
+## full ADDITIVE model
 modelfull = gam(CallingHours ~ s(avg_chlora_per_day) + s(avg_sst_per_day), data = masterdf)
 AIC(modelfull)
 summary(modelfull)
