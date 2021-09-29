@@ -1,0 +1,1072 @@
+---
+title: "Ashley and Vanessa Humpback Habitat Modeling"
+author: "Ashley Adornato and Vanessa ZoBell"
+date: "8/17/2021"
+output: html_document
+---
+
+~ CHUNK 1 ~
+
+Welcome to the Humpback Habitat Modeling code! Here, we are investigating whether there is a relationship between humpback whale acoustic presence and local environmental variables.
+
+Acoustic data from the years 2010-2014 were collected using a High-Frequency Acoustic Recording Package (HARP) located at Site B in the Santa Barbara Channel. Humpback encounters were analyzed using long term spectral averages, and confirmed in a spectrogram by an analyst (Go Ash!!). 
+
+Chlorophyll-a and Upwelling data were downloaded as a .nc file from ERRDAP, an open access oceanographic and environmental database. The Upwelling Index was then calculated using the Baukin Upwelling Index Model. Sea Surface temperature, wind speed, wind direction, and significant wave height data were collected by NOAA buoy Station 46053 in the Channel Islands. Krill abundance was downloaded from the Brinton and Townsend Database.
+
+
+First, we will take a moment to load in all of the packages and functions we need.
+(if you have already formed your master data frame, please skip to chunk # ___)
+```{r, include=FALSE}
+# ~ CHUNK 1 ~
+
+# holy canoly this is a lot of packages, if you don't have to install, you'll need to do that first sis
+
+## PACKAGES
+library(ncdf4)           # for opening .nc files
+library(lubridate)       # for dates
+library(dplyr)           # for data wrangling
+library(mgcv)            
+
+library(mgcViz)          # for plotting gams
+library(ChemoSpecUtils)
+library(geepack)         # for the GEEs (Wald's hypothesis tests allowed)
+library(splines)         # to construct the B-splines within a GEE-GLM
+library(tidyverse)       # because it literally does everything
+#library(rjags)           # replacement for geeglm which is out of date
+library(ROCR)            # to build the ROC curve
+library(PresenceAbsence) # to build the confusion matrix
+library(ggplot2)         # to build the partial residual plots
+library(mvtnorm)         # to build the partial residual plots
+library(gridExtra)       # to build the partial residual plots
+library(SimDesign)
+library(regclass)
+library(car)             # for ANOVA
+library(gamm4)           # for GAM
+library(corrplot)        # correlation map
+library(timetk)          # timeseries plots
+library(MuMIn)
+library(mctest)         #individual collinearity diagnostics
+library(xts)
+
+
+## FUNCTIONS
+
+# to convert dates in .nc files
+daysFromDate <- function(data1, data2="1970-01-01")
+{
+  round(as.numeric(difftime(data1,data2,units = "secs")))
+}                        
+# to convert dates in .nc files
+daysFromDate1992 <- function(data1, data2="1992-01-01")
+{
+  round(as.numeric(difftime(data1,data2,units = "secs")))
+}                        
+# to convert dates from matlab files
+matlab2POS = function(x, timez = "UTC") {
+  days = x - 719529 	# 719529 = days from 1-1-0000 to 1-1-1970
+  secs = days * 86400 # 86400 seconds in a day
+  # This next string of functions is a complete disaster, but it works.
+  # It tries to outsmart R by converting the secs value to a POSIXct value
+  # in the UTC time zone, then converts that to a time/date string that
+  # should lose the time zone, and then it performs a second as.POSIXct()
+  # conversion on the time/date string to get a POSIXct value in the user's
+  # specified timezone. Time zones are a goddamned nightmare.
+  return(as.POSIXct(strftime(as.POSIXct(secs, origin = '1970-1-1',
+                                        tz = 'UTC'), format = '%Y-%m-%d %H:%M',
+                             tz = 'UTC', usetz = FALSE), tz = timez))
+}
+
+upwell <- function(ektrx, ektry, coast_angle) {
+  pi <- 3.1415927
+  degtorad <- pi/180.
+  alpha <- (360 - coast_angle) * degtorad
+  s1 <- cos(alpha)
+  t1 <- sin(alpha)
+  s2 <- -1 * t1
+  t2 <- s1
+  perp <- (s1 * ektrx) + (t1 * ektry)
+  para <- (s2 * ektrx) + (t2 * ektry)
+  return(perp/10)
+}
+
+```
+~ Chunk 2 ~
+
+
+Next, we will analyze what our humpback calling hours look like across the timeseries under investigation.
+(If you want to read more about timeseries plots, see this page: https://cran.r-project.org/web/packages/timetk/vignettes/TK04_Plotting_Time_Series.html)
+
+
+```{r, echo=FALSE}
+# ~ Chunk 2 ~
+
+getwd()
+#setwd("/Users/vanessazobell/Google Drive/Shared drives/Ashley Adornato")
+humpbackdata = read.csv('G:/Shared drives/Ashley Adornato/HumpbackDetectionsHabitatModel_v3.csv')
+
+# formating matlab datenum to character string
+humpbackdata$date = as.Date(matlab2POS(humpbackdata$datenum))
+# converting date to a format we will use later
+humpbackdata$date = as.Date(matlab2POS(humpbackdata$datenum))
+
+# selecting just the date and the value for our timeseries plot
+timeseries = select(humpbackdata, date, CallingHours)
+timeseries$date = as.Date(timeseries$date, "%m/%d/%Y")
+
+timeseries= filter(timeseries, CallingHours < 24)
+
+# plotting a time series, colors represent different years
+timeseries %>% 
+  plot_time_series(date, CallingHours, 
+                   .color_var = year(date), 
+                   .facet_ncol = 2, 
+                   .facet_scales = "free", 
+                   .interactive = FALSE, 
+                   .title = "", 
+                   .x_lab = "Date (1 day intervals)", 
+                   .y_lab = "Calling Hours", 
+                   .color_lab = "Year")
+
+
+```
+~ Chunk 3 ~
+
+OO LALA! Pretty colors! It looks like the humpies are there in the spring and the fall. Next let's figure out why that might be!!
+
+
+
+
+
+Next, we will be looking different environmental variables to see how they may be connected to the calling hours we are seeing in the time series. First we will need to find some environmental data. The variables that we are looking at so far are chlorophyll-a, temperature, wind speed, wind direction, sea surface temperature, and krill abundance. We will first look at them one by one.  
+
+Chlorophyll-a: downloaded from the ERRDAP server as a .csv file (https://coastwatch.pfeg.noaa.gov/erddap/index.html)
+
+Temperature, wind speed, wind direction, wave height: downloaded from NOAA Buoy Station 46053 as a .csv file
+(https://www.ndbc.noaa.gov/station_history.php?station=46053)
+
+Krill abundance: Brinton and Townsend Database, all months, all cruises, all times of day, all sizes, sexes, and stages
+(http://oceaninformatics.ucsd.edu/euphausiid/)
+
+Upwelling Index: downloaded from ERRDAP server as a .nc file, then calculated via equation from: 
+https://oceanview.pfeg.noaa.gov/products/upwelling/bakun
+
+Fish Data: downloaded from CalCOFI site 
+
+
+
+ASHLEY/VANESSA TO DO: 
+- add units to predictor variable time series plots (make look better?) - AA
+- add comments to each line to say what each line does (example with chlorophyll) - AA
+- make timeseries x-axis same as humpback calling hour analysis date range - AA
+- Add 2009 buoy data - VZ
+
+```{r, echo=FALSE}
+
+# ~ Chunk 3 ~
+
+#----------------------------------------------- Chlorophyll 
+
+## Loading in .nc files downloaded from ERRDAP
+chloraData <- nc_open("G:/Shared drives/Ashley Adornato/CHLORA_2009_2015.nc")
+
+## pulling out lat, lon, and time variables for sst from .nc file
+lon <- ncvar_get(chloraData, "longitude")
+lat <- ncvar_get(chloraData, "latitude")
+time <- ncvar_get(chloraData, "time")
+
+## latitude and longitude bounds 20 km around Site B
+lati = 34.247568
+long = -120.025978
+lat_hi = lat + ((20/6377)*(180/pi))
+lat_lo = lat - ((20/6377)*(180/pi))
+long_hi = long + ((20/6377)*(180/pi))/cos(lat*pi/180)
+long_lo = long - ((20/6377)*(180/pi))/cos(lat*pi/180)
+
+
+## indexing for data within specific lat and lon bounds
+lonIdx <- which( lon >= long_lo & lon <= long_hi)
+latIdx <- which( lat >= lat_lo & lat <= lat_hi)
+
+## indexing for data within specific time bounds
+myTime <- c(daysFromDate("2009-11-03"), daysFromDate("2014-12-31"))
+timeIdx <- which(time >= myTime[1] & time <= myTime[2])
+
+## pulling out sst data from from lat, lon, and time indices
+data <- ncvar_get(chloraData, "chlorophyll")[lonIdx, latIdx, timeIdx]
+
+## pulling out lat, long, time data from indices
+indices <- expand.grid(lon[lonIdx], lat[latIdx], time[timeIdx])
+
+
+## combining sst, lat, long, and time and converting to a dataframe
+dfchlora <- data.frame(cbind(indices, as.vector(data)))
+
+## getting rid of n/a
+dfchlora = na.omit(dfchlora)
+
+## converting date to usable format of date
+dfchlora$date = as.character(as.Date(format(as.POSIXct(dfchlora$Var3, origin =   "1970-01-01",tz = "GMT"), format = '%Y-%m-%d')))
+
+
+## averaging chlor-a per day for mean daily values
+chloraday <- dfchlora %>%
+  group_by(date) %>%
+  summarize(mean_Chlora = mean(as.vector.data.))
+
+
+
+## making date class date to plot as time series
+chloraday$date = as.Date(chloraday$date, format = "%Y-%m-%d")
+
+## plotting timeseries
+chloraday %>% 
+  plot_time_series(date, mean_Chlora,
+                   .color_var = year(date), 
+                   .facet_ncol = 2, 
+                   .facet_scales = "free", 
+                   .interactive = FALSE, 
+                   .title = "Chlorophyll-A Concentration (mg/m^3)", 
+                   .x_lab = "Date (1 day intervals)", 
+                   .y_lab = "Chlorophyll-A Concentration", 
+                   .color_lab = "Year")
+
+
+# GET RID OF OUTLIERS FOR CHLOR-A
+boxplot(chloraday$mean_Chlora, plot=TRUE)
+outliers = boxplot(chloraday$mean_Chlora, plot=FALSE)$out
+chloraday =  chloraday[-which(chloraday$mean_Chlora %in% outliers),]
+
+
+#----------------------------------------------- Upwelling index
+
+## Loading in .nc files downloaded from ERRDAP
+
+UIndex <- nc_open('G:/Shared drives/Ashley Adornato/UpwellingIndex2.nc')
+
+## pulling out lat, lon, and time variables for sst from .nc file
+lon <- ncvar_get(UIndex, "longitude")
+lat <- ncvar_get(UIndex, "latitude")
+time <- ncvar_get(UIndex, "time")
+
+## latitude and longitude bounds 20 km around Site B
+lati = 34.247568
+long = -120.025978
+lat_hi = 34.6
+lat_lo = 33.6
+long_hi = -119
+long_lo = -121
+
+
+## indexing for data within specific lat and lon bounds
+lonIdx <- which( lon >= long_lo & lon <= long_hi)
+latIdx <- which( lat >= lat_lo & lat <= lat_hi)
+
+## indexing for data within specific time bounds
+myTime <- c(daysFromDate("2009-11-03"), daysFromDate("2014-12-31"))
+timeIdx <- which(time >= myTime[1] & time <= myTime[2])
+
+## pulling out ekman transport (x and y) and curl data from from lat, lon, and time indices
+curl <- ncvar_get(UIndex, "curl")[lonIdx, latIdx, timeIdx]
+ektrx = ncvar_get(UIndex, "ektrx")[lonIdx, latIdx, timeIdx]
+ektry = ncvar_get(UIndex, "ektry")[lonIdx, latIdx, timeIdx]
+
+## pulling out lat, long, time data from indices
+indices <- expand.grid(lon[lonIdx], lat[latIdx], time[timeIdx])
+
+
+## combining sst, lat, long, and time and converting to a dataframe
+curl <- data.frame(cbind(indices, as.vector(curl)))
+ektrx <- data.frame(cbind(indices, as.vector(ektrx)))
+ektry <- data.frame(cbind(indices, as.vector(ektry))) 
+
+ekmanALL = left_join(ektrx, ektry)
+
+## getting rid of n/a
+ekmanALL = na.omit(ekmanALL)
+
+## converting date to usable format of date
+ekmanALL$date = as.character(as.Date(format(as.POSIXct(ekmanALL$Var3, origin =   "1970-01-01",tz = "GMT"), format = '%Y-%m-%d')))
+
+
+## averaging ekman for mean daily values
+ekmanDay <- ekmanALL %>%
+  group_by(date) %>%
+  summarize(ektrx = mean(as.vector.ektrx.), 
+            ektry = mean(as.vector.ektry.))
+
+ekmanDay$date = as.Date(ekmanDay$date, format = "%Y-%m-%d")
+
+coast_angle = 135 ##### CHECK UR OWN!!!!
+
+
+ekmanDay$UI = upwell(ekmanDay$ektrx, ekmanDay$ektry, coast_angle = coast_angle)
+ekmanDay %>% 
+  plot_time_series(date, UI,
+                   .color_var = year(date), 
+                   .facet_ncol = 2, 
+                   .facet_scales = "free", 
+                   .interactive = FALSE, 
+                   .title = "Upwelling Index", 
+                   .x_lab = "Date (1 day intervals)", 
+                   .y_lab = "Upwelling Index", 
+                   .color_lab = "Year")
+
+# GET RID OF UPWELLING INDEX
+boxplot(ekmanDay$UI, plot=FALSE)$out
+outliers = boxplot(ekmanDay$UI, plot=FALSE)$out
+ekmanDay =  ekmanDay[-which(ekmanDay$UI %in% outliers),]
+
+#----------------------------------------------- SST, Wind, Wave Height
+## Loading in .csv files downloaded from NOAA
+buoyData = read.csv('G:/Shared drives/Ashley Adornato/NOAA_Buoy_Data_2010_2020Header.csv')
+buoyData$WaveHeight.m.[which(buoyData$WaveHeight.m. == 99)] <- NA
+
+## Currently, the data is organized so that it has a different row per hour of every day, but we just want the average temp, winddir, & wind speed per day - not by each hour of the day. 
+dayBuoy = buoyData %>%
+  group_by(Year, Month, Day) %>%
+  summarise(mean_Temp = mean(SeaSurfTemp.degC.),
+            mean_WindSpeed = mean(WindSpeed.m.s.),
+            mean_WindDir = mean(WindDir.degT.), 
+            meanWaveHeight = mean(WaveHeight.m.))
+
+
+## changes the format of the dates in the dayBuoy dataframe and filters for mean temps less than 50 degrees
+dayBuoy$Month <- sprintf("%02d", as.numeric(as.character(dayBuoy$Month)))
+dayBuoy$Day <- sprintf("%02d", as.numeric(as.character(dayBuoy$Day)))
+dayBuoy$date = paste(dayBuoy$Year,dayBuoy$Month,dayBuoy$Day, sep = "-")
+dayBuoy$date = as.Date(dayBuoy$date)
+
+
+
+
+
+
+
+
+
+#-----------------------------------------------------------
+
+## GET RID OF OUTLIERS FOR TEMP, SPEED, DIR, WAVEHEIGHT
+# outlier temperatures
+temp = select(dayBuoy, date, mean_Temp)
+outliers = boxplot(temp$mean_Temp, plot=FALSE)$out
+temp =  temp[-which(temp$mean_Temp %in% outliers),]
+
+# outlier windspeed
+windSpeed = select(dayBuoy, date, mean_WindSpeed)
+outliers = boxplot(windSpeed$mean_WindSpeed, plot=FALSE)$out
+windSpeed =  windSpeed[-which(windSpeed$mean_WindSpeed %in% outliers),]
+
+# outlier wind direction
+windDir = select(dayBuoy, date, mean_WindDir)
+outliers = boxplot(windDir$mean_WindDir, plot=FALSE)$out
+windDir =  windDir[-which(windDir$mean_WindDir %in% outliers),]
+
+# outlier mean wave height doesn't have any outliers
+waveHeight = select(dayBuoy, date, meanWaveHeight)
+outliers = boxplot(waveHeight$meanWaveHeight, plot=FALSE)$out
+waveHeight =  waveHeight[-which(waveHeight$meanWaveHeight %in% outliers),]
+
+
+## combines the separate dayBuoy dataframes so that there is one 'master' dataframe for all buoy related data
+buoyALL = left_join(temp, windSpeed, by = "date")
+buoyALL = left_join(buoyALL, windDir, by = "date")
+buoyALL = left_join(buoyALL, waveHeight, by = "date")
+
+buoyALL = select(buoyALL, date, mean_Temp, mean_WindSpeed, mean_WindDir, meanWaveHeight)
+
+## filters for days before January 1 of 2015 (because we are only looking up to data before 2015), and gets rid of all of the rows that have no data (N/A) 
+buoyALL = filter(buoyALL, date < "2015-01-01")
+buoyALL = na.omit(buoyALL)
+
+
+## lookin' at her
+buoyALL %>% 
+  plot_time_series(date, mean_Temp,
+                   .color_var = year(date), 
+                   .facet_ncol = 2, 
+                   .facet_scales = "free", 
+                   .interactive = FALSE, 
+                   .title = "Temperature (Degrees Celsius)", 
+                   .x_lab = "Date (1 day intervals)", 
+                   .y_lab = "Temperature", 
+                   .color_lab = "Year")
+buoyALL %>% 
+  plot_time_series(date, mean_WindSpeed,
+                   .color_var = year(date), 
+                   .facet_ncol = 2, 
+                   .facet_scales = "free", 
+                   .interactive = FALSE, 
+                   .title = "Wind Speed (m/s)", 
+                   .x_lab = "Date (1 day intervals)", 
+                   .y_lab = "Wind Speed", 
+                   .color_lab = "Year")
+buoyALL %>% 
+  plot_time_series(date, mean_WindDir,
+                   .color_var = year(date), 
+                   .facet_ncol = 2, 
+                   .facet_scales = "free", 
+                   .interactive = FALSE, 
+                   .title = "Wind Direction (Tens of Degrees)", 
+                   .x_lab = "Date (1 day intervals)", 
+                   .y_lab = "Wind Direction", 
+                   .color_lab = "Year")
+buoyALL %>% 
+  plot_time_series(date, meanWaveHeight,
+                   .color_var = year(date), 
+                   .facet_ncol = 2, 
+                   .facet_scales = "free", 
+                   .interactive = FALSE, 
+                   .title = "Significant Wave Height (Meters)", 
+                   .x_lab = "Date (1 day intervals)", 
+                   .y_lab = "Significant Wave Height", 
+                   .color_lab = "Year")
+
+
+#----------------------------------------------- Fish Larvae CalCOFI
+
+##  Loading in .csv files downloaded from CalCOFI
+fish = read.csv('G:/Shared drives/Ashley Adornato/CalCOFIdata_FULL.csv')
+
+## selecting for only some of the data that they give - they give more variables than we care to look at 
+fish = select(fish, time, percent_sorted, total_plankton_volume, total_larvae, latitude, longitude)
+
+## replacing the 'T's that they put in the time column with a blank space (nothing), and replacing the Z's in the day column with nothing. 
+fish$day = gsub('T', ' ', fish$time)
+fish$day = gsub('Z', '', fish$day)
+
+##changing the format of the date in the day column, then omitting rows with N/A
+fish$day = as.Date(fish$day)
+fish$date = format(fish$day, "%m/%d/%Y")
+options(na.action = "na.omit")
+
+
+##  making a new dataframe called fishdata where larvae is displayed as an average per day instead of having multiple values per day as in the original fish dataframe
+fishData = fish %>%
+  group_by(date) %>%
+  summarise(mean_larvae = mean(total_larvae))
+
+
+## changing the format of the date and filtering for all days before jan 1 2015
+fishData$date = as.Date(fishData$date, format = "%m/%d/%Y")
+fishData = filter(fishData, date < "2015-01-01")
+
+##making a plot to display fish data
+fishData %>% 
+  plot_time_series(date, mean_larvae,
+                   .color_var = year(date), 
+                   .facet_ncol = 2, 
+                   .facet_scales = "free", 
+                   .interactive = FALSE, 
+                   .title = "Fish Larvae", 
+                   .x_lab = "Date (1 day intervals)", 
+                   .y_lab = "Fish Larvae", 
+                   .color_lab = "Year")
+
+#----------------------------------------------- Zooplankton Data (Brinton and Townsend Database)
+
+## loading in the .csv file from Brinton and Townsend and selecting for specific variables in that dataset
+krill = read.csv('G:/Shared drives/Ashley Adornato/Krill_Data_Brinton_Townsend.csv')
+krill = select(krill, Date, Latitude, Longitude, Abundance)
+
+
+##  making a new dataframe called krilldata where krill is displayed as an average per day instead of having multiple values per day as in the original krill dataframe
+krillData = krill %>%
+  group_by(Date) %>%
+  summarise(mean_krill = mean(Abundance))
+
+## changing the format of date in the krillData dataframe
+krillData$date = as.Date(krillData$Date, format = "%m/%d/%Y")
+
+
+##making a plot for the krill data
+krillData %>% 
+  plot_time_series(date, mean_krill,
+                   .color_var = year(date), 
+                   .facet_ncol = 2, 
+                   .facet_scales = "free", 
+                   .interactive = FALSE, 
+                   .title = "Krill (abundance per m^2) ", 
+                   .x_lab = "Date (1 day intervals)", 
+                   .y_lab = "Krill", 
+                   .color_lab = "Year")
+
+
+
+```
+
+
+Ok, so now we have all of our environmental variables set up, and our humpback calling hours and presence data set up, but they are all separate, OH NO! What are we going to do?!
+We must combine them to make a "master" data frame (as Ashley likes to call it!)
+
+
+
+
+
+
+```{r, echo=FALSE}
+# i'm sure there's a way to do this all at the same time, but i'll just do separately for now..
+
+
+# Including dates that we did not have recordings and putting NANs for humpback calling hours
+full_dates <- seq(min(humpbackdata$date), max(humpbackdata$date), 
+                  by = "day")
+full_dates <- data.frame(date = full_dates)
+
+# joining data frames
+masterdf = left_join(full_dates, humpbackdata, by = "date")
+masterdf = left_join(masterdf, chloraday, by = "date")
+masterdf = left_join(masterdf, buoyALL, by = "date")
+masterdf = left_join(masterdf, ekmanDay, by = "date")
+masterdf = left_join(masterdf, fishData, by = "date")
+masterdf = left_join(masterdf, krillData, by = "date")
+masterdf$presence =  ifelse(masterdf$CallingHours > 0, 1, 0)
+
+#making neater / getting rid of shiz columns I don't need anymore
+masterdf = select(masterdf, date, CallingHours, presence, mean_Chlora, mean_Temp, mean_WindSpeed, mean_WindDir, meanWaveHeight, UI, mean_larvae, mean_krill)
+
+```
+There may be some non-environmental variables that may give insight into humpback presence, such as the day of the year (julian day) and the year itself. 
+
+
+
+```{r, echo=FALSE}
+
+#adding temporal variables Julian day and year
+masterdf$julian = yday(as.Date(masterdf$date, format = "%m/%d/%Y"))
+masterdf$year = format(as.Date(masterdf$date, format = "%m/%d/%Y"), "%Y")
+
+
+
+
+
+``` 
+
+OK so we have our enviry variables, but those humpies ain't eaten the phyto or the wind amiright?! There may be a ~LAG~ in the effects of the enviries on the humpback presence, so let's put in some lags sis!!
+
+Barlow et al. 2021 found that there were lags on environmental variables varying from 1, 2, and 3 weeks for blue whales depending on the site they were at. Blue whales obvs aren't humpies, but this is what we have, so we are going to try lags for 1, 2, and 3 weeks and see what happens to us, EEP. 
+
+
+```{r, echo=FALSE}
+# Making lagged data variables
+
+# selecting the environmental variables that I'm tryna laggggg
+enviro2LAG = select(masterdf, date, mean_Chlora, mean_Temp, mean_WindSpeed, mean_WindDir, meanWaveHeight, UI, mean_larvae, mean_krill)
+
+
+# pushing chlora 7 days up (-7 days)
+LAG7 = enviro2LAG %>%
+    tk_xts(silent = TRUE) %>%
+    lag.xts(k = -7)
+
+# converting to data frame
+LAG7 = data.frame(date=index(LAG7), coredata(LAG7))
+
+# renaming the variables so there aren't doubles with the old dataframe
+LAG7 = LAG7 %>% 
+  rename(
+    mean_Chlora7 = mean_Chlora,
+    mean_Temp7 = mean_Temp, 
+    mean_WindSpeed7 = mean_WindSpeed, 
+    mean_WindDir7 = mean_WindDir, 
+    meanWaveHeight7 = meanWaveHeight, 
+    UI7 = UI,
+    mean_larvae7 = mean_larvae, 
+    mean_krill7 = mean_krill, 
+    )
+
+
+#joining 7 day laggers to master df
+masterdf = left_join(masterdf, LAG7, by = "date")
+
+## lag for chlorophyll - 14 days
+LAG14 = enviro2LAG %>%
+    tk_xts(silent = TRUE) %>%
+    lag.xts(k = -14)
+
+LAG14 = data.frame(date=index(LAG14), coredata(LAG14))
+
+LAG14 = LAG14 %>% 
+  rename(
+    mean_Chlora14 = mean_Chlora,
+    mean_Temp14 = mean_Temp, 
+    mean_WindSpeed14 = mean_WindSpeed, 
+    mean_WindDir14 = mean_WindDir, 
+    meanWaveHeight14 = meanWaveHeight, 
+    UI14 = UI,
+    mean_larvae14 = mean_larvae,
+    mean_krill14 = mean_krill, 
+    )
+
+
+masterdf = left_join(masterdf, LAG14, by = "date")
+
+
+## lag for chlorophyll - 21 days
+LAG21 = enviro2LAG %>%
+    tk_xts(silent = TRUE) %>%
+    lag.xts(k = -21)
+
+LAG21 = data.frame(date=index(LAG21), coredata(LAG21))
+# renaming the variables so there aren't doubles with the old dataframe
+LAG21 = LAG21 %>% 
+  rename(
+    mean_Chlora21 = mean_Chlora,
+    mean_Temp21 = mean_Temp, 
+    mean_WindSpeed21 = mean_WindSpeed, 
+    mean_WindDir21 = mean_WindDir, 
+    meanWaveHeight12 = meanWaveHeight, 
+    UI21 = UI,
+    mean_larvae21 = mean_larvae, 
+    mean_krill21 = mean_krill, 
+    )
+
+masterdf = left_join(masterdf, LAG21, by = "date")
+
+
+
+```
+
+We gotta make sure that our environmental variables aren't correlated with eachother, so we do a test for colinearity!
+
+```{r, echo=FALSE}
+
+# VISUAL REPRESENTATION OF COLINEARITY
+colinData = select(masterdf,  mean_Chlora, mean_Temp, mean_WindSpeed, UI, mean_WindDir, meanWaveHeight)
+data = na.omit(colinData)
+## create correlation matrix
+corData = cor(data)
+## plot correlation map in AOE order
+corrplot(corData,type = "lower",  order = "AOE",tl.col = "black",tl.srt=45,diag = FALSE)
+
+
+# Individual collinearity diagnostics
+# **Variation Inflaction Factor** (VIF)
+# A better diagnostic for assessing whether coefficients are poorly estimated due to colinearity are the variance inflation factor. 
+# Colinearity exist if VIF > 5 or TOL ~ 0.
+
+modelFULL = gam(presence ~ mean_Chlora+ mean_Temp + mean_WindSpeed + UI + mean_WindDir + meanWaveHeight, data = masterdf)
+
+imcdiag(modelFULL, method = "VIF", vif = 10, corr = TRUE)
+
+plot(imcdiag(modelFULL, method = "VIF")[[1]][,1]) # vif plot
+
+
+```
+PHEW, we safe! Our variables are not colinear. Let's move on to autocorrelation.
+
+
+We want to now make sure that our response variable (calling hours / presence) isn't correlated with itself in any way (autocorrelation). We will check to see if there is any temporal autocorrelation within our response variable, because this may predict observations taken closely together in time to be correlated, regardless of the predictor variables we have. If we ignore this autocorrelation, our results will be biased. 
+
+
+Checking for autocorrelation:
+TO DO: 
+- do what I did to test autocorrelation with calling hours but for presence! & watch youtube vids abt it -AA
+```{r, echo=FALSE}
+#options(na.action = "na.action.default")
+## --------------------------------------------- Testing for autocorrelation
+## Data exploration and initial analysis 
+#Investigate autocorrelation for call hours/day to work out block sizes:
+acf(masterdf$presence, lag.max = 1000)
+acf(masterdf$CallingHours, lag.max = 60, ylim = c(0, 0.4), xlim = c(30, 60))
+# 44 days is the first day in which the autocorrelation function is below the confidence intervals
+
+#ON MODEL RESIDUALS
+
+BlockModHump = glm(presence~
+                     julian +
+                     as.factor(year),
+                   data = masterdf)
+
+## Investigate autocorrelation for presence/absence
+acf(masterdf$presence, lag.max = 1000)
+acf(masterdf$presence,lag.max = 60, ylim = c(0, 0.4), xlim = c(10,60))
+#autocorrelation function below confidence at 43 days
+
+#BlockModHump = glm(presence ~
+                     #julian +
+                     #as.factor(year),
+                   #data = masterdf)
+
+
+#Quick ANOVA to check for significance of variables - using the car package
+Anova(BlockModHump)
+summary(BlockModHump)
+acf(residuals(BlockModHump), lag.max = 100, ylim=c(0,0.1))
+acf(residuals(BlockModHump), lag.max = 100, ylim=c(0,0.1), xlim =c(10,60))
+#ACFval = 28
+
+
+#create the blocks based on the full timeseries
+#startDate = masterdf$date[1]  # first date in time series
+#endDate = masterdf$date[nrow(masterdf)]  # last date in time series
+#timeseries = data.frame(date=seq(startDate, endDate, by="day"))
+#preBlock = rep(1:(floor(nrow(masterdf)/ACFval)), times=1, each=ACFval)
+#divdiff = nrow(masterdf) - length(preBlock)
+#last = tail(preBlock, n = 1)+1
+#lastVec = rep(last,each = divdiff)
+#masterdf$blockCallingHour = c(preBlock,lastVec)
+
+
+
+```
+
+WOW autocorrelation was v confusing - need 2 watch more youtube but it is set up now yay. 
+(We didn't implement it into our model this time, so this is a next step)
+
+
+
+NOW - we are starting the ~model fitting~ process. good luck! 
+
+```{r,echo = FALSE, warning = FALSE, message=FALSE, error=TRUE}
+### GAM tests of every combination of smoothed & non smoothed and varied lags for every envr variable (no lags for julian day)
+
+
+# Null Model
+nullModel = gam(CallingHours~1, data = masterdf)
+AIC(nullModel)
+summary(nullModel)
+
+
+## chlor-a models
+# no lag linear
+model1 = gam(presence ~ mean_Chlora, data = masterdf)
+# no lag smooth
+model2 = gam(presence ~ s(mean_Chlora), data = masterdf)
+# 7 day lag linear
+model3 = gam(presence ~ mean_Chlora7, data = masterdf)
+# 7 day lag smooth
+model4 = gam(presence ~ s(mean_Chlora7), data = masterdf)
+# 14 day lag linear
+model5 = gam(presence ~ mean_Chlora14, data = masterdf)
+# 14 day lag smooth
+model6 = gam(presence ~ s(mean_Chlora14), data = masterdf)
+# 21 day lag linear
+model7 = gam(presence ~ mean_Chlora21, data = masterdf)
+# 21 day lag smooth
+model8 = gam(presence ~ s(mean_Chlora21), data = masterdf)
+
+AIC(model1)
+AIC(model2)
+AIC(model3)
+AIC(model4)
+AIC(model5)
+AIC(model6)
+AIC(model7)
+AIC(model8)
+
+summary(model1)
+summary(model2)
+summary(model3)
+summary(model4)
+summary(model5)
+summary(model6)
+summary(model7)
+summary(model8)
+ 
+b = getViz(model4)
+print(plot(b, allTerms = T), pages = 1)
+
+
+
+## sst models
+# no lag linear
+model1 = gam(presence ~ mean_Temp, data = masterdf)
+# no lag smooth
+model2 = gam(presence ~ s(mean_Temp), data = masterdf)
+# 7 day lag linear
+model3 = gam(presence ~ mean_Temp7, data = masterdf)
+# 7 day lag smooth
+model4 = gam(presence ~ s(mean_Temp7), data = masterdf)
+# 14 day lag linear
+model5 = gam(presence ~ mean_Temp14, data = masterdf)
+# 14 day lag smooth
+model6 = gam(presence ~ s(mean_Temp14), data = masterdf)
+# 21 day lag linear
+model7 = gam(presence ~ mean_Temp21, data = masterdf)
+# 21 day lag smooth
+model8 = gam(presence ~ s(mean_Temp21), data = masterdf)
+
+AIC(model1)
+AIC(model2)
+AIC(model3)
+AIC(model4)
+AIC(model5)
+AIC(model6)
+AIC(model7)
+AIC(model8)
+
+summary(model1)
+summary(model2)
+summary(model3)
+summary(model4)
+summary(model5)
+summary(model6)
+summary(model7)
+summary(model8)
+
+b = getViz(model6)
+print(plot(b, allTerms = T), pages = 1)
+
+
+
+## significant wave height models
+# no lag linear
+model1 = gam(presence ~ meanWaveHeight, data = masterdf)
+# no lag smooth
+model2 = gam(presence ~ s(meanWaveHeight), data = masterdf)
+# 7 day lag linear
+model3 = gam(presence ~ meanWaveHeight7, data = masterdf)
+# 7 day lag smooth
+model4 = gam(presence ~ s(meanWaveHeight7), data = masterdf)
+# 14 day lag linear
+model5 = gam(presence ~ meanWaveHeight14, data = masterdf)
+# 14 day lag smooth
+model6 = gam(presence ~ s(meanWaveHeight14), data = masterdf)
+# 21 day lag linear
+model7 = gam(presence ~ meanWaveHeight12, data = masterdf)
+# 21 day lag smooth
+model8 = gam(presence ~ s(meanWaveHeight12), data = masterdf)
+
+AIC(model1)
+AIC(model2)
+AIC(model3)
+AIC(model4)
+AIC(model5)
+AIC(model6)
+AIC(model7)
+AIC(model8)
+
+summary(model1)
+summary(model2)
+summary(model3)
+summary(model4)
+summary(model5)
+summary(model6)
+summary(model7)
+summary(model8)
+
+b = getViz(model3)
+print(plot(b, allTerms = T), pages = 1)
+
+
+
+## wind speed models
+model1 = gam(presence ~ mean_WindSpeed, data = masterdf)
+# no lag smooth
+model2 = gam(presence ~ s(mean_WindSpeed), data = masterdf)
+# 7 day lag linear
+model3 = gam(presence ~ mean_WindSpeed7, data = masterdf)
+# 7 day lag smooth
+model4 = gam(presence ~ s(mean_WindSpeed7), data = masterdf)
+# 14 day lag linear
+model5 = gam(presence ~ mean_WindSpeed14, data = masterdf)
+# 14 day lag smooth
+model6 = gam(presence ~ s(mean_WindSpeed14), data = masterdf)
+# 21 day lag linear
+model7 = gam(presence ~ mean_WindSpeed21, data = masterdf)
+# 21 day lag smooth
+model8 = gam(presence ~ s(mean_WindSpeed21), data = masterdf)
+
+AIC(model1)
+AIC(model2)
+AIC(model3)
+AIC(model4)
+AIC(model5)
+AIC(model6)
+AIC(model7)
+AIC(model8)
+
+summary(model1)
+summary(model2)
+summary(model3)
+summary(model4)
+summary(model5)
+summary(model6)
+summary(model7)
+summary(model8)
+
+b = getViz(model6)
+print(plot(b, allTerms = T), pages = 1)
+
+
+
+## wind direction models
+model1 = gam(presence ~ mean_WindDir, data = masterdf)
+# no lag smooth
+model2 = gam(presence ~ s(mean_WindDir), data = masterdf)
+# 7 day lag linear
+model3 = gam(presence ~ mean_WindDir7, data = masterdf)
+# 7 day lag smooth
+model4 = gam(presence ~ s(mean_WindDir7), data = masterdf)
+# 14 day lag linear
+model5 = gam(presence ~ mean_WindDir14, data = masterdf)
+# 14 day lag smooth
+model6 = gam(presence ~ s(mean_WindDir14), data = masterdf)
+# 21 day lag linear
+model7 = gam(presence ~ mean_WindDir21, data = masterdf)
+# 21 day lag smooth
+model8 = gam(presence ~ s(mean_WindDir21), data = masterdf)
+
+
+AIC(model1)
+AIC(model2)
+AIC(model3)
+AIC(model4)
+AIC(model5)
+AIC(model6)
+AIC(model7)
+AIC(model8)
+
+summary(model1)
+summary(model2)
+summary(model3)
+summary(model4)
+summary(model5)
+summary(model6)
+summary(model7)
+summary(model8)
+
+b = getViz(model4)
+print(plot(b, allTerms = T), pages = 1)
+
+
+
+## upwelling Index Models
+model1 = gam(presence ~ UI, data = masterdf)
+# no lag smooth
+model2 = gam(presence ~ s(UI), data = masterdf)
+# 7 day lag linear
+model3 = gam(presence ~ UI7, data = masterdf)
+# 7 day lag smooth
+model4 = gam(presence ~ s(UI7), data = masterdf)
+# 14 day lag linear
+model5 = gam(presence ~ UI14, data = masterdf)
+# 14 day lag smooth
+model6 = gam(presence ~ s(UI14), data = masterdf)
+# 21 day lag linear
+model7 = gam(presence ~ UI21, data = masterdf)
+# 21 day lag smooth
+model8 = gam(presence ~ s(UI21), data = masterdf)
+
+AIC(model1)
+AIC(model2)
+AIC(model3)
+AIC(model4)
+AIC(model5)
+AIC(model6)
+AIC(model7)
+AIC(model8)
+
+summary(model1)
+summary(model2)
+summary(model3)
+summary(model4)
+summary(model5)
+summary(model6)
+summary(model7)
+summary(model8)
+
+b = getViz(model7)
+print(plot(b, allTerms = T), pages = 1)
+
+
+## mean krill models
+model1 = gam(presence ~ mean_krill, data = masterdf)
+model2 = gam(presence ~ s(mean_krill), data = masterdf)
+model3 = gam(presence ~ mean_krill7, data = masterdf)
+model4 = gam(presence ~ s(mean_krill7), data = masterdf)
+model5 = gam(presence ~ (mean_krill14), data = masterdf)
+model6 = gam(presence ~ s(mean_krill14), data = masterdf)
+model7 = gam(presence ~ mean_krill21, data = masterdf)
+model8 = gam(presence ~ s(mean_krill21), data = masterdf)
+
+AIC(model1)
+AIC(model2)
+AIC(model3)
+AIC(model4)
+AIC(model5)
+AIC(model6)
+AIC(model7)
+AIC(model8)
+
+summary(model1)
+summary(model2)
+summary(model3)
+summary(model4)
+summary(model5)
+summary(model6)
+summary(model7)
+summary(model8)
+
+b = getViz(model2)
+print(plot(b, allTerms = T), pages = 1)
+
+
+## mean larvae models
+model1 = gam(presence ~ mean_larvae, data = masterdf)
+model2 = gam(presence ~ s(mean_larvae), data = masterdf)
+model3 = gam(presence ~ mean_larvae7, data = masterdf)
+model4 = gam(presence ~ s(mean_larvae7), data = masterdf)
+model5 = gam(presence ~ (mean_larvae14), data = masterdf)
+model6 = gam(presence ~ s(mean_larvae14), data = masterdf)
+model7 = gam(presence ~ mean_larvae21, data = masterdf)
+model8 = gam(presence ~ s(mean_larvae21), data = masterdf)
+
+AIC(model1)
+AIC(model2)
+AIC(model3)
+AIC(model4)
+AIC(model5)
+AIC(model6)
+AIC(model7)
+AIC(model8)
+
+summary(model1)
+summary(model2)
+summary(model3)
+summary(model4)
+summary(model5)
+summary(model6)
+summary(model7)
+summary(model8)
+
+b = getViz(model2)
+print(plot(b, allTerms = T), pages = 1)
+
+
+
+
+## julian day models
+model1 = gam(CallingHours ~ julian, data = masterdf)
+model2 = gam(presence~ s(julian), data = masterdf)
+
+AIC(model1)
+AIC(model2)
+
+summary(model1)
+summary(model2)
+
+b = getViz(model2)
+print(plot(b, allTerms = T), pages = 1)
+
+
+# now we're just going to put in the variables that were significant and had an AIC value below the null model
+# we chose the version of the environmental variable that had the lowest AIC and p-value
+
+options(na.action = "na.fail")
+modelfull1 = gam(presence ~ s(mean_Chlora7) + s(mean_Temp14) + meanWaveHeight7 + s(mean_WindSpeed14) + UI21 + s(mean_WindDir7) + s(julian), data = masterdf)
+summary(modelfull)
+
+modelfull2 = gam(presence ~ s(mean_Chlora7) + s(mean_Temp14) + s(mean_WindSpeed14) + UI21 + s(mean_WindDir7) + s(julian), data = masterdf)
+summary(modelfull2)
+
+modelfull3 = gam(presence ~  + s(mean_Temp14) + s(mean_WindDir7) + s(julian), data = masterdf)
+summary(modelfull3)
+
+
+summary(modelfull)
+
+
+b = getViz(modelfull)
+print(plot(b, allTerms = T), pages = 1)
