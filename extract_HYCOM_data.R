@@ -24,14 +24,14 @@
 # SETTINGS ----------------------------------------------------------------
 
 # Enter covariate(s) of interest 
-covars = c("salinity","water_temp")
+covars = c("water_temp")
 
 # Enter regions of interest; "global" (1/12degree) OR "GoM" (1/25degree)
 region <- c("global")
 
 # Enter date range(s) of interest in pairs of start/end dates
-dateS <- as.Date(c('2016-05-01')) # start date(s)
-dateE <- as.Date(c('2016-07-30')) # end date(s)
+dateS <- as.Date(c('2016-02-01')) # start date(s)
+dateE <- as.Date(c('2016-04-30')) # end date(s)
 
 # Enter study area boundaries in decimal degree lat/long limits
 latS <- c(24) # southern bound(s)
@@ -40,11 +40,11 @@ lonE <- c(-63) # eastern bound(s); use "-" for west of Prime Meridian
 lonW <- c(-82) # western bound(s); use "-" for west of Prime Meridian
 
 # SET AT LEAST ONE OF THESE TO NaN
-vertCoord = NaN # Enter a single vertical layer to grab (e.g. 1 for 0.0m, see depths above) OR
-vertStride = 1 # Enter vertical stride (1 for all depth layers, 2 for every other, etc.)
+vertCoord = 1 # Enter a single vertical layer to grab (e.g. 1 for 0.0m, see depths above) OR
+vertStride = NaN # Enter vertical stride (1 for all depth layers, 2 for every other, etc.)
 
 # Directory to save data; be sure to use forward slashes!
-saveDir = "J:/DataScrapingCode/Test"
+saveDir = "I:/DataScrapingCode/Test"
 
 
 # Action ------------------------------------------------------------------
@@ -56,7 +56,7 @@ library(curl)
 dir.create(file.path(saveDir), recursive = TRUE, showWarnings = FALSE)
 setwd(saveDir)
 
-# Base urls and data dates for each experiment; note the dates do not reflect the true start/end
+# Base urls and data dates for each experiment; note these dates do not reflect the true start/end
 # dates of the experiments, but are adjusted to eradicate temporal overlap between experiments
 global_expts = data.frame(
   url=c('http://ncss.hycom.org/thredds/ncss/GLBv0.08/expt_53.X/data/1994',
@@ -116,6 +116,9 @@ gom_expts = data.frame(
   start=c(as.Date('1993-01-01'), as.Date('2013-01-01'), as.Date('2014-09-01'), as.Date('2019-01-01')),
   end=c(as.Date('2012-12-31'), as.Date('2014-08-30'), as.Date('2018-12-31'), as.Date('2021-07-15')))
 
+vertLayers = c(0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0,
+               35.0, 40.0, 45.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0, 125.0, 150.0, 200.0, 250.0, 300.0, 350.0,
+               400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0, 1250.0, 1500.0, 2000.0, 2500.0, 3000.0, 4000.0, 5000.0)
 
 for (i in 1:length(dateS)) # for each set of dates
 {
@@ -163,21 +166,28 @@ for (i in 1:length(dateS)) # for each set of dates
       dlSpecs = sprintf('%saddLatLon=true&', dlSpecs)
       # Get data in netcdf4 format
       dlSpecs = sprintf('%saccept=netcdf4&', dlSpecs)
-      # Add the time range(s) and construct download url(s)
+      
+      # for (j in 1:length(url)){
+      #   }
+      
+      # For each subset of data
       for (j in 1:length(url)){
+        # Add the time range(s) and construct download url(s)
         url[j] <- paste(url[j],sprintf('%stime_start=%s%%3A00%%3A00Z&time_end=%s%%3A00%%3A00Z&timeStride=1',
-                 dlSpecs, strftime(dateSubsetStarts[j], '%Y-%m-%dT00'),
-                 strftime(dateSubsetEnds[j], '%Y-%m-%dT00')),sep='')}
-      
-      # Create file name to save data
-      fileName = sprintf('%s/HYCOM_%s_lat%.2f-%.2f_lon%.2f-%.2f_%s_%s.nc4',saveDir,
-                         covars[l],latN[k],latS[k],lonE[k],lonW[k],dateS[i],dateE[i])
-      
-      # Download the data
-      for (j in 1:length(url)){
+                                       dlSpecs, strftime(dateSubsetStarts[j], '%Y-%m-%dT00'),
+                                       strftime(dateSubsetEnds[j], '%Y-%m-%dT00')),sep='')
+        
+        # Create file name to save data
+        # fileName = sprintf('%s/HYCOM_%s_lat%.2f-%.2f_lon%.2f-%.2f_%s_%s.nc4',saveDir,
+        #                    covars[l],latN[k],latS[k],lonE[k],lonW[k],dateS[i],dateE[i])
+        fileName = sprintf('%s/HYCOM_%s_%.0f_%s_%s_%.0f.nc4',saveDir,
+                           covars[l],vertLayers[vertCoord],dateS[i],dateE[i],j)
+        
+        # Download the data
         #download.file(url[j], fileName, quiet=FALSE)
         curl_download(url[j], fileName, quiet=FALSE, mode="wb")
-        return(sprintf('Downloading %s data from %s',covariates[l],url[j]))}
+        # return(sprintf('Downloading %s data from %s',covars[l],url[j]))
+        }
     }
   }
 }
