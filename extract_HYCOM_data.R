@@ -24,14 +24,14 @@
 # SETTINGS ----------------------------------------------------------------
 
 # Enter covariate(s) of interest 
-covars = c("water_temp")
+covars = c("water_temp","salinity")
 
 # Enter regions of interest; "global" (1/12degree) OR "GoM" (1/25degree)
 region <- c("global")
 
 # Enter date range(s) of interest in pairs of start/end dates
-dateS <- as.Date(c('2016-02-01')) # start date(s)
-dateE <- as.Date(c('2016-04-30')) # end date(s)
+dateS <- as.Date(c('2016-09-01','2017-01-01')) # start date(s)
+dateE <- as.Date(c('2016-10-30','2017-04-30')) # end date(s)
 
 # Enter study area boundaries in decimal degree lat/long limits
 latS <- c(24) # southern bound(s)
@@ -120,11 +120,9 @@ vertLayers = c(0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0,
                35.0, 40.0, 45.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0, 125.0, 150.0, 200.0, 250.0, 300.0, 350.0,
                400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0, 1250.0, 1500.0, 2000.0, 2500.0, 3000.0, 4000.0, 5000.0)
 
-for (i in 1:length(dateS)) # for each set of dates
-{
+for (i in 1:length(dateS)){ # for each set of dates
   
-  for (k in 1:length(latS)) # for each study area
-  {
+  for (k in 1:length(latS)){ # for each study area
   
     for (l in 1:length(covars)){ # for each covariate
       
@@ -180,13 +178,19 @@ for (i in 1:length(dateS)) # for each set of dates
         # Create file name to save data
         # fileName = sprintf('%s/HYCOM_%s_lat%.2f-%.2f_lon%.2f-%.2f_%s_%s.nc4',saveDir,
         #                    covars[l],latN[k],latS[k],lonE[k],lonW[k],dateS[i],dateE[i])
-        fileName = sprintf('%s/HYCOM_%s_%.0f_%s_%s_%.0f.nc4',saveDir,
-                           covars[l],vertLayers[vertCoord],dateS[i],dateE[i],j)
+        if (length(url)>1){
+          fileName = sprintf('%s/HYCOM_%s_%.0f_%s_%s_%.0f.nc4',saveDir,
+                             covars[l],vertLayers[vertCoord],dateSubsetStarts[j],dateSubsetEnds[j],j)
+        } else {
+          fileName = sprintf('%s/HYCOM_%s_%.0f_%s_%s.nc4',saveDir,
+                             covars[l],vertLayers[vertCoord],dateSubsetStarts[j],dateSubsetEnds[j])
+        }
         
         # Download the data
         #download.file(url[j], fileName, quiet=FALSE)
+        #sprintf('Downloading %s data from %s',covars[l],url[j])
         curl_download(url[j], fileName, quiet=FALSE, mode="wb")
-        # return(sprintf('Downloading %s data from %s',covars[l],url[j]))
+         
         }
     }
   }
