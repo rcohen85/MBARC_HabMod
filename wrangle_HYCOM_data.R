@@ -25,8 +25,9 @@ colnames(HARPs) = c("Lat","Lon")
 # list all files in given directory
 # find file names containing given covar
 # create loop running through each file name containing given covar (1st loop)
-# identify file names containing given depth (for (i in c(0, 50, 100, 200, 500, 1000, 2000, 3000m 4000)){...})
-# load files one at a time (will construct a full file path for each one, use nc_open, then grab variables)
+# identify file names containing given depth 
+# load files one at a time (2nd loop: for (i in c(0, 50, 100, 200, 500, 1000, 2000, 3000m 4000)){...})
+# (will construct a full file path for each one, use nc_open, then grab variables)
 # grab covar values at HARP locations
 # organize into data frame (ll rows x lots of columns); name new data frames for each covar (assign())
 # move onto next depth
