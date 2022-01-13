@@ -2,7 +2,7 @@
 # Pull ocean state estimate data from HYCOM for study area(s) and period(s) of interest.
 # Script will loop through every combination of input area(s) and period(s). Requested 
 # variables are downloaded individually, with separate files for each vertical layer. 
-# Must have pracma and curl packages installed.
+# Must have pracma, curl, and stringr packages installed.
 
 # Global data are available from 1994-01-01 through 2020-02-18; resolution is 1/12 degree;
 # covariates available are: surf_el, salinity, water_temp, water_u, water_v, salinity_bottom, 
@@ -54,6 +54,7 @@ saveDir = "I:/DataScrapingCode/Test"
 
 library(pracma)
 library(curl)
+library(stringr)
 
 # Check if save directory exists; if not, then create it
 dir.create(file.path(saveDir), recursive = TRUE, showWarnings = FALSE)
@@ -186,12 +187,12 @@ for (i in 1:length(dateS)){ # for each set of dates
                                            strftime(dateSubsetEnds[j], '%Y-%m-%dT00')),sep='')
             
             # Create file name to save data
-              fileName = sprintf('%s/HYCOM_%s_%s_%s_%s.nc4',saveDir,
-                                 covars[l],vertlb,dateSubsetStarts[j],dateSubsetEnds[j])
+            saveDateS = str_remove_all(dateSubsetStarts[j],'-')
+            saveDateE = str_remove_all(dateSubsetEnds[j],'-')
+            fileName = sprintf('%s/HYCOM_%s_%s_%s_%s.nc4',saveDir,
+                                 covars[l],vertlb,saveDateS,saveDateE)
             
             # Download the data
-            #download.file(url[j], fileName, quiet=FALSE)
-            #sprintf('Downloading %s data from %s',covars[l],url[j])
             curl_download(url[j], fileName, quiet=FALSE, mode="wb")
           }
         } else { # If vertical stride was specified
@@ -205,13 +206,12 @@ for (i in 1:length(dateS)){ # for each set of dates
                                          strftime(dateSubsetEnds[j], '%Y-%m-%dT00')),sep='')
           
           # Create file name to save data
-
-            fileName = sprintf('%s/HYCOM_%s_%s_%s_%s.nc4',saveDir,
-                               covars[l],vertlb,dateSubsetStarts[j],dateSubsetEnds[j])
+          saveDateS = str_remove_all(dateSubsetStarts[j],'-')
+          saveDateE = str_remove_all(dateSubsetEnds[j],'-')
+          fileName = sprintf('%s/HYCOM_%s_%s_%s_%s.nc4',saveDir,
+                             covars[l],vertlb,saveDateS,saveDateE)
           
           # Download the data
-          #download.file(url[j], fileName, quiet=FALSE)
-          #sprintf('Downloading %s data from %s',covars[l],url[j])
           curl_download(url[j], fileName, quiet=FALSE, mode="wb")
           
         }
