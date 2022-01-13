@@ -43,7 +43,7 @@ lonE <- c(-63) # eastern bound(s); use "-" for west of Prime Meridian
 lonW <- c(-82) # western bound(s); use "-" for west of Prime Meridian
 
 # SET AT LEAST ONE OF THESE TO NaN
-vertCoord = c(1,20) # Enter vertical layer(s) to grab (e.g. 1 for 0.0m, see depths above) OR
+vertCoord = c(0,100) # Enter vertical layer(s) to grab (see available depths above) OR
 vertStride = NaN # Enter vertical stride (1 for all depth layers, 2 for every other, etc.)
 
 # Directory to save data; be sure to use forward slashes!
@@ -176,8 +176,9 @@ for (i in 1:length(dateS)){ # for each set of dates
             url <- global_expts$url[idxRange]
             
             # Specify vertical layer
-            dlSpecs2 = sprintf('%svertCoord=%s&', dlSpecs, vertCoord[m])
-            vertlb = sprintf('vertLayer_%s',vertLayers[vertCoord[m]]) 
+            layerID = which(vertLayers==vertCoord[m])
+            dlSpecs2 = sprintf('%svertCoord=%s&', dlSpecs, layerID)
+            vertlb = sprintf('vertLayer_%s',vertCoord[m]) 
             
             # Add the time range(s) and construct download url(s)
             url[j] <- paste(url[j],sprintf('%stime_start=%s%%3A00%%3A00Z&time_end=%s%%3A00%%3A00Z&timeStride=1',
@@ -204,13 +205,9 @@ for (i in 1:length(dateS)){ # for each set of dates
                                          strftime(dateSubsetEnds[j], '%Y-%m-%dT00')),sep='')
           
           # Create file name to save data
-          if (length(url)>1){
-            fileName = sprintf('%s/HYCOM_%s_%s_%s_%s_%s.nc4',saveDir,
-                               covars[l],vertlb,dateSubsetStarts[j],dateSubsetEnds[j],j)
-          } else {
+
             fileName = sprintf('%s/HYCOM_%s_%s_%s_%s.nc4',saveDir,
                                covars[l],vertlb,dateSubsetStarts[j],dateSubsetEnds[j])
-          }
           
           # Download the data
           #download.file(url[j], fileName, quiet=FALSE)
