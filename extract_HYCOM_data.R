@@ -18,7 +18,7 @@
 
 # Script is set to download data as netCDF4 with associated lat/lon coordinates
 
-# WARNING: When requesting all depth layers the data requests get real big! 
+# WARNING: When requesting all depth layers (vertStride=1) the data requests get real big! 
 # Attempting to download too much data returns an error ("HTTP error 400")
 # Try specifying a few depth layers to limit data size.
 # Also, when a specified date range spans more than one experiment, a separate file
@@ -89,7 +89,7 @@ global_expts = data.frame(
         'http://ncss.hycom.org/thredds/ncss/GLBv0.08/expt_57.7',
         'http://ncss.hycom.org/thredds/ncss/GLBv0.08/expt_92.9',
         'http://ncss.hycom.org/thredds/ncss/GLBv0.08/expt_93.0',
-        'http://ncss.hycom.org/thredds/ncss/GLBv0.08/expt_93.0'), 
+        'http://ncss.hycom.org/thredds/ncss/GLBy0.08/expt_93.0'), 
   start=c(as.Date('1994-01-01'), as.Date('1995-01-01'), as.Date('1996-01-01'),
           as.Date('1997-01-01'), as.Date('1998-01-01'), as.Date('1999-01-01'),
           as.Date('2000-01-01'), as.Date('2001-01-01'), as.Date('2002-01-01'),
