@@ -185,13 +185,8 @@ for (i in 1:length(dateS)){ # for each set of dates
                                            strftime(dateSubsetEnds[j], '%Y-%m-%dT00')),sep='')
             
             # Create file name to save data
-            if (length(url)>1){
-              fileName = sprintf('%s/HYCOM_%s_%s_%s_%s_%s.nc4',saveDir,
-                                 covars[l],vertlb,dateSubsetStarts[j],dateSubsetEnds[j],j)
-            } else {
               fileName = sprintf('%s/HYCOM_%s_%s_%s_%s.nc4',saveDir,
                                  covars[l],vertlb,dateSubsetStarts[j],dateSubsetEnds[j])
-            }
             
             # Download the data
             #download.file(url[j], fileName, quiet=FALSE)
