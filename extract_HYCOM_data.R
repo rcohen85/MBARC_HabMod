@@ -30,8 +30,8 @@ covars = c("water_temp","salinity")
 region <- c("global")
 
 # Enter date range(s) of interest in pairs of start/end dates
-dateS <- as.Date(c('2016-09-01','2017-01-01')) # start date(s)
-dateE <- as.Date(c('2016-10-30','2017-04-30')) # end date(s)
+dateS <- as.Date(c('2016-09-20','2017-01-25')) # start date(s)
+dateE <- as.Date(c('2016-10-10','2017-02-10')) # end date(s)
 
 # Enter study area boundaries in decimal degree lat/long limits
 latS <- c(24) # southern bound(s)
@@ -40,7 +40,7 @@ lonE <- c(-63) # eastern bound(s); use "-" for west of Prime Meridian
 lonW <- c(-82) # western bound(s); use "-" for west of Prime Meridian
 
 # SET AT LEAST ONE OF THESE TO NaN
-vertCoord = 1 # Enter a single vertical layer to grab (e.g. 1 for 0.0m, see depths above) OR
+vertCoord = c(1,20) # Enter vertical layer(s) to grab (e.g. 1 for 0.0m, see depths above) OR
 vertStride = NaN # Enter vertical stride (1 for all depth layers, 2 for every other, etc.)
 
 # Directory to save data; be sure to use forward slashes!
@@ -123,7 +123,7 @@ vertLayers = c(0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0,
 for (i in 1:length(dateS)){ # for each set of dates
   
   for (k in 1:length(latS)){ # for each study area
-  
+    
     for (l in 1:length(covars)){ # for each covariate
       
       # Determine which experiment(s) to pull data from based on desired region & date range
@@ -131,7 +131,7 @@ for (i in 1:length(dateS)){ # for each set of dates
         q <- which(dateS[i] >= global_expts$start)
         r <- which(dateE[i] <= global_expts$end)
         idxRange <- c(tail(q,1):r[1])
-        url <- global_expts$url[idxRange]
+        # url <- global_expts$url[idxRange]
         dateSubsetStarts <- global_expts$start[idxRange] # subset date ranges by experiment
         dateSubsetEnds <- global_expts$end[idxRange]
         dateSubsetStarts[1] <- dateS[i]
@@ -140,7 +140,7 @@ for (i in 1:length(dateS)){ # for each set of dates
         q <- which(dateS[i] >= gom_expts$start)
         r <- which(dateE[i] <= gom_expts$end)
         idxRange <- c(tail(q,1):r[1])
-        url <- gom_expts$url[idxRange]
+        # url <- gom_expts$url[idxRange]
         dateSubsetStarts <- gom_expts$start[idxRange]
         dateSubsetEnds <- gom_expts$ends[idxRange]
         dateSubsetStarts[1] <- dateS[i]
@@ -155,43 +155,73 @@ for (i in 1:length(dateS)){ # for each set of dates
       # Add the spatial bounds
       dlSpecs = sprintf('%snorth=%.4f&west=%.4f&east=%.4f&south=%.4f&disableProjSubset=on&horizStride=1&',
                         dlSpecs, latN[k], lonW[k], lonE[k], latS[k] )
-      # Specify vertical layers
-      if (!is.na(vertCoord)){
-        dlSpecs = sprintf('%svertCoord=%d&', dlSpecs, vertCoord)} 
-      if (!is.na(vertStride)){
-        dlSpecs = sprintf('%svertStride=%d&', dlSpecs, vertStride)}
+      if (!is.na(vertStride)){ # Specify vertical stride (if using)
+        dlSpecs = sprintf('%svertStride=%s&', dlSpecs, vertStride)
+        vertlb = sprintf('vertStride_%s',vertStride)}
       # Download associated lat-lon points
       dlSpecs = sprintf('%saddLatLon=true&', dlSpecs)
       # Get data in netcdf4 format
       dlSpecs = sprintf('%saccept=netcdf4&', dlSpecs)
       
-      # for (j in 1:length(url)){
-      #   }
       
-      # For each subset of data
-      for (j in 1:length(url)){
-        # Add the time range(s) and construct download url(s)
-        url[j] <- paste(url[j],sprintf('%stime_start=%s%%3A00%%3A00Z&time_end=%s%%3A00%%3A00Z&timeStride=1',
-                                       dlSpecs, strftime(dateSubsetStarts[j], '%Y-%m-%dT00'),
-                                       strftime(dateSubsetEnds[j], '%Y-%m-%dT00')),sep='')
+      for (j in 1:length(idxRange)){ # For each temporal subset of data
         
-        # Create file name to save data
-        # fileName = sprintf('%s/HYCOM_%s_lat%.2f-%.2f_lon%.2f-%.2f_%s_%s.nc4',saveDir,
-        #                    covars[l],latN[k],latS[k],lonE[k],lonW[k],dateS[i],dateE[i])
-        if (length(url)>1){
-          fileName = sprintf('%s/HYCOM_%s_%.0f_%s_%s_%.0f.nc4',saveDir,
-                             covars[l],vertLayers[vertCoord],dateSubsetStarts[j],dateSubsetEnds[j],j)
-        } else {
-          fileName = sprintf('%s/HYCOM_%s_%.0f_%s_%s.nc4',saveDir,
-                             covars[l],vertLayers[vertCoord],dateSubsetStarts[j],dateSubsetEnds[j])
+        if (any(!is.na(vertCoord))){ # If vertical layer(s) have been specified
+          for (m in 1:length(vertCoord)){ # For each vertical layer
+            
+            # Grab appropriate url(s)
+            url <- global_expts$url[idxRange]
+            
+            # Specify vertical layer
+            dlSpecs2 = sprintf('%svertCoord=%s&', dlSpecs, vertCoord[m])
+            vertlb = sprintf('vertLayer_%s',vertLayers[vertCoord[m]]) 
+            
+            # Add the time range(s) and construct download url(s)
+            url[j] <- paste(url[j],sprintf('%stime_start=%s%%3A00%%3A00Z&time_end=%s%%3A00%%3A00Z&timeStride=1',
+                                           dlSpecs2, strftime(dateSubsetStarts[j], '%Y-%m-%dT00'),
+                                           strftime(dateSubsetEnds[j], '%Y-%m-%dT00')),sep='')
+            
+            # Create file name to save data
+            if (length(url)>1){
+              fileName = sprintf('%s/HYCOM_%s_%s_%s_%s_%s.nc4',saveDir,
+                                 covars[l],vertlb,dateSubsetStarts[j],dateSubsetEnds[j],j)
+            } else {
+              fileName = sprintf('%s/HYCOM_%s_%s_%s_%s.nc4',saveDir,
+                                 covars[l],vertlb,dateSubsetStarts[j],dateSubsetEnds[j])
+            }
+            
+            # Download the data
+            #download.file(url[j], fileName, quiet=FALSE)
+            #sprintf('Downloading %s data from %s',covars[l],url[j])
+            curl_download(url[j], fileName, quiet=FALSE, mode="wb")
+          }
+        } else { # If vertical stride was specified
+          
+          # Grab appropriate url(s)
+          url <- global_expts$url[idxRange]
+          
+          # Add the time range(s) and construct download url(s)
+          url[j] <- paste(url[j],sprintf('%stime_start=%s%%3A00%%3A00Z&time_end=%s%%3A00%%3A00Z&timeStride=1',
+                                         dlSpecs, strftime(dateSubsetStarts[j], '%Y-%m-%dT00'),
+                                         strftime(dateSubsetEnds[j], '%Y-%m-%dT00')),sep='')
+          
+          # Create file name to save data
+          if (length(url)>1){
+            fileName = sprintf('%s/HYCOM_%s_%s_%s_%s_%s.nc4',saveDir,
+                               covars[l],vertlb,dateSubsetStarts[j],dateSubsetEnds[j],j)
+          } else {
+            fileName = sprintf('%s/HYCOM_%s_%s_%s_%s.nc4',saveDir,
+                               covars[l],vertlb,dateSubsetStarts[j],dateSubsetEnds[j])
+          }
+          
+          # Download the data
+          #download.file(url[j], fileName, quiet=FALSE)
+          #sprintf('Downloading %s data from %s',covars[l],url[j])
+          curl_download(url[j], fileName, quiet=FALSE, mode="wb")
+          
         }
         
-        # Download the data
-        #download.file(url[j], fileName, quiet=FALSE)
-        #sprintf('Downloading %s data from %s',covars[l],url[j])
-        curl_download(url[j], fileName, quiet=FALSE, mode="wb")
-         
-        }
+      }
     }
   }
 }
