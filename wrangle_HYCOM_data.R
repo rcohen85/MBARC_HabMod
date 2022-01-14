@@ -1,7 +1,7 @@
 
 ######## Settings ------------------
 
-inDir = "E:/ModelingCovarData"
+inDir = "E:/ModelingCovarData/Temperature"
 var = "water_temp"
 depth = list("_0m", "_50m", "_100m", "_200m", "_500m", "_1000m", "_3000m", "_4000m")
 
@@ -24,55 +24,83 @@ rownames(HARPs) = c("HZ","OC","NC","BC","WC","NFC","HAT","GS","BP","BS","JAX")
 colnames(HARPs) = c("Lat","Lon")
 
 
-allFiles = list.files(path = "E:/ModelingCovarData/Temperature") # list all files in given directory
+allFiles = list.files(path = inDir) # list all files in given directory
 varFiles = allFiles[grep(var, allFiles)] # find file names containing given covar
 
-for(i in 1:length(varFiles)) {# create loop running through each file name containing given covar (1st loop)
+
+for(k in 1:length(depth)) { # for each specified depths
   
-  for(k in 1:length(depth)) { #loop through for our specified depths
+  # find files matching this depth
+  thisDepthInd = which(!is.na(str_match(varFiles,unlist(depth[k]))))
+  
+  # initialize data frame to hold data from all files matching this depth & covar
+  masterData = list(Covar = double(),
+                    Coords = double(),
+                    Time = double())
+  
+  for (j in 1:length(thisDepthInd)){ # for each file matching this depth
     
-    # depthvar = str_subset(varFiles, depth[k])
-    thisDepthInd = which(!is.na(str_match(varFiles,unlist(depth[k]))))
+    # assemble file name
+    ncfilename = paste(inDir,'/',varFiles[thisDepthInd[j]],sep="") # file name will need to be constructed prior to this step!
+    ncin = nc_open(ncfilename)
+    # print(ncin)
     
-    for (j in 1:length(thisDepthInd)){
-      # load files one at a time (2nd loop: for (i in c(0, 50, 100, 200, 500, 1000, 2000, 3000m 4000)){...})
-      ncfilename = paste(inDir,'/',varFiles[thisDepthInd[j]],'.nc4',sep="") # file name will need to be constructed prior to this step!
-      ncin = nc_open(ncfilename)
-      print(ncin)
+    # load data
+    thisCovar = ncvar_get(ncin,"water_temp") 
+    lat = ncvar_get(ncin,"lat")
+    lon = ncvar_get(ncin,"lon")
+    time = ncvar_get(ncin,"time") 
+    
+    # initialize array to hold data from this file
+    thisFile = list(Covar = double(),
+                    Coords = double(),
+                    Time = double())
+    
+    for (l in 1:length(time)){ # for each time stamp in this file
       
-      # initialize data frame to hold values of variable at each HARP site
-      # use assign()
+      dat = matrix(nrow=11,ncol=1)
+      coord = matrix(nrow=11,ncol=1)
+      timeSt = matrix(nrow=11,ncol=1)
       
-      # grab covar values at HARP locations
-      for (i in 1:length(HARPs)){
+      for (m in 1:nrow(HARPs)){ # for each HARP site
         
-        HZlat = which.min(abs(HARPs[i,1]-lat))
-        HZlon = which.min(abs(HARPs[i,2]-lon))
+        # find data points nearest this HARP site
+        sitelat = which.min(abs(HARPs[m,1]-lat))
+        sitelon = which.min(abs(HARPs[m,2]-lon))
         
-        temp[HZlon,HZlat]
-        
-        # organize into data frame (ll rows x lots of columns); name new data frames for each covar (assign())
-        
+        # grab covar values at this HARP site
+        dat[m,1] = thisCovar[sitelon,sitelat,l]
+        coord[m] = list(c(lat[sitelat],lon[sitelon]))
+        timeSt[m,1] = time[l]
       }
+      
+      # add to array for this file
+      thisFile$Covar = cbind(thisFile$Covar,dat)
+      thisFile$Coords = cbind(thisFile$Coords,coord)
+      thisFile$Time = cbind(thisFile$Time,timeSt)
       
     }
     
-  } # move onto next depth
+    masterData$Covar = cbind(masterData$Covar,thisFile$Covar)
+    masterData$Coords = cbind(masterData$Coords,thisFile$Coords)
+    masterData$Time = cbind(masterData$Time,thisFile$Time)
+    
+  }
   
-  # save all data frames for a given covar
+  assign(paste(var,depth[k],sep=""),masterData)
   
-} # move onto next covar
-
-
-
-
-
-temp = ncvar_get(ncin,"water_temp")
-lat = ncvar_get(ncin,"lat")
-lon = ncvar_get(ncin,"lon")
-time = ncvar_get(ncin,"time") # might want to name this something generic, since the covar listed in line 5 will change
-
-
-
   
+} # move onto next depth
+
+# save all data frames for a given covar
+
+
+
+
+
+
+
+
+
+
 
