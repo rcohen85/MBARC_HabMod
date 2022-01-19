@@ -1,8 +1,8 @@
 
 ######## Settings ------------------
 
-inDir = "E:/ModelingCovarData/Temperature"
-var = "water_temp"
+inDir = "E:/ModelingCovarData/Temperature" # directory containing nc4 files
+var = "water_temp" # must be given just as it appears in the HYCOM .nc4 files
 depth = list("_0m", "_50m", "_100m", "_200m", "_500m", "_1000m", "_3000m", "_4000m")
 
 
@@ -24,11 +24,11 @@ rownames(HARPs) = c("HZ","OC","NC","BC","WC","NFC","HAT","GS","BP","BS","JAX")
 colnames(HARPs) = c("Lat","Lon")
 
 
-allFiles = list.files(path = inDir) # list all files in given directory
+allFiles = list.files(path=inDir,pattern=".nc4") # list all files in given directory
 varFiles = allFiles[grep(var, allFiles)] # find file names containing given covar
 
 
-for(k in 1:length(depth)) { # for each specified depths
+for(k in 1:length(depth)) { # for each specified depth
   
   # find files matching this depth
   thisDepthInd = which(!is.na(str_match(varFiles,unlist(depth[k]))))
@@ -41,17 +41,17 @@ for(k in 1:length(depth)) { # for each specified depths
   for (j in 1:length(thisDepthInd)){ # for each file matching this depth
     
     # assemble file name
-    ncfilename = paste(inDir,'/',varFiles[thisDepthInd[j]],sep="") # file name will need to be constructed prior to this step!
+    ncfilename = paste(inDir,'/',varFiles[thisDepthInd[j]],sep="")
     ncin = nc_open(ncfilename)
     # print(ncin)
     
     # load data
-    thisCovar = ncvar_get(ncin,"water_temp") 
+    thisCovar = ncvar_get(ncin,var) 
     lat = ncvar_get(ncin,"lat")
     lon = ncvar_get(ncin,"lon")
     time = ncvar_get(ncin,"time") 
     
-    # initialize array to hold data from this file
+    # initialize array to hold relevant data points from this file
     thisFile = list(Covar = double(),
                     Coords = double(),
                     Time = double())
@@ -74,25 +74,31 @@ for(k in 1:length(depth)) { # for each specified depths
         timeSt[m,1] = time[l]
       }
       
-      # add to array for this file
+      # add data from this time stamp to array for this file
       thisFile$Covar = cbind(thisFile$Covar,dat)
       thisFile$Coords = cbind(thisFile$Coords,coord)
       thisFile$Time = cbind(thisFile$Time,timeSt)
       
     }
     
+    # add data points from all time stamps in this file to master data frame
     masterData$Covar = cbind(masterData$Covar,thisFile$Covar)
     masterData$Coords = cbind(masterData$Coords,thisFile$Coords)
     masterData$Time = cbind(masterData$Time,thisFile$Time)
     
+    rm(thisCovar) # clear this variable to free up memory
+    
   }
   
-  assign(paste(var,depth[k],sep=""),masterData)
+  # rename this variable with the covariate and depth in the name
+  # assign(paste(var,depth[k],sep=""),masterData)
   
+  # save this depth dataframe 
+  save(masterData,file=paste(inDir,'/',var,depth[k],'.Rdata',sep=""))
+  rm(masterData) # clear this variable to free up memory
   
 } # move onto next depth
 
-# save all data frames for a given covar
 
 
 
