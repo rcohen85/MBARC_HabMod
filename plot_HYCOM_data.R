@@ -8,7 +8,7 @@ library(stringr)
 ## Settings -------------------------------------------------------
 inDir = c('E:/ModelingCovarData/Temperature')
 covar = 'water_temp'
-depths = c(0,50,100,200,500,1000,3000,4000) # order to organize depth layers for plotting
+depths = c(0,50,100,200,500,1000,2000, 3000,4000) # order to organize depth layers for plotting
 sites = c('HZ','OC','NC','BC','WC','NFC','HAT','GS','BP','BS','JAX') 
 # NOTE: site order should match order of coordinates below
 
