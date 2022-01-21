@@ -1,8 +1,8 @@
 
 ######## Settings ------------------
 
-inDir = c("E:/ModelingCovarData/V-Velocity") # directory containing nc4 files
-var = c("water_v") # must be given just as it appears in the HYCOM .nc4 files
+inDir = c("E:/ModelingCovarData/Temperature") # directory containing nc4 files
+var = c("water_temp") # must be given just as it appears in the HYCOM .nc4 files
 depth = list("_0m", "_50m", "_100m", "_200m", "_500m", "_1000m", "_3000m", "_4000m")
 
 
@@ -96,22 +96,22 @@ for (i in 1:length(var)){
       
     }
     
-    # rename this variable with the covariate and depth in the name
-    assign(paste(var,depth[k],'_data',sep=""),masterData.Covar)
-    assign(paste(var,depth[k],'_lat',sep=""),masterData.Lat)
-    assign(paste(var,depth[k],'_lon',sep=""),masterData.Lon)
-    assign(paste(var,depth[k],'_time',sep=""),masterData.Time)
+    # # rename this variable with the covariate and depth in the name
+    # assign(paste(var,depth[k],'_data',sep=""),masterData.Covar)
+    # assign(paste(var,depth[k],'_lat',sep=""),masterData.Lat)
+    # assign(paste(var,depth[k],'_lon',sep=""),masterData.Lon)
+    # assign(paste(var,depth[k],'_time',sep=""),masterData.Time)
+    # 
+    # # save this depth dataframe 
+    # action = paste("save(",paste(var,depth[k],'_data,',sep=""),
+    #                paste(var,depth[k],'_lat,',sep=""),
+    #                paste(var,depth[k],'_lon,',sep=""),
+    #                paste(var,depth[k],'_time',sep=""),
+    #                ',file=',paste("'",inDir[i],'/',var[i],depth[k],'.Rdata',"'",sep=""),')',sep="")
+    # eval(parse(text=action))
     
-    # save this depth dataframe 
-    action = paste("save(",paste(var,depth[k],'_data,',sep=""),
-                   paste(var,depth[k],'_lat,',sep=""),
-                   paste(var,depth[k],'_lon,',sep=""),
-                   paste(var,depth[k],'_time',sep=""),
-                   ',file=',paste("'",inDir[i],'/',var[i],depth[k],'.Rdata',"'",sep=""),')',sep="")
-    eval(parse(text=action))
-    
-    # save(masterData,file=paste(inDir[i],'/',var[i],depth[k],'.Rdata',sep=""))
-    rm(masterData) # clear this variable to free up memory
+    save(masterData.Covar,masterData.Lat,masterData.Lon,masterData.Time,
+         file=paste(inDir[i],'/',var[i],depth[k],'.Rdata',sep=""))
     
   } # move onto next depth
   
