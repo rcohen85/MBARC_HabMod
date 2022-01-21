@@ -33,10 +33,11 @@ for (i in 1:length(var)){
     # find files matching this depth
     thisDepthInd = which(!is.na(str_match(allFiles,unlist(depth[k]))))
     
-    # initialize data frame to hold data from all files matching this depth & covar
-    masterData = list(Covar = double(),
-                      Coords = double(),
-                      Time = double())
+    # initialize arrays to hold data from all files matching this depth & covar
+    masterData.Covar = double()
+    masterData.Lat = double()
+    masterData.Lon = double()
+    masterData.Time = double()
     
     for (j in 1:length(thisDepthInd)){ # for each file matching this depth
       
@@ -51,15 +52,17 @@ for (i in 1:length(var)){
       lon = ncvar_get(ncin,"lon")
       time = ncvar_get(ncin,"time") 
       
-      # initialize array to hold relevant data points from this file
-      thisFile = list(Covar = double(),
-                      Coords = double(),
-                      Time = double())
+      # initialize arrays to hold relevant data points from this file
+      thisFile.Covar = double()
+      thisFile.Lat = double()
+      thisFile.Lon = double()
+      thisFile.Time = double()
       
       for (l in 1:length(time)){ # for each time stamp in this file
         
         dat = matrix(nrow=11,ncol=1)
-        coord = matrix(nrow=11,ncol=1)
+        thisDatLat = matrix(nrow=11,ncol=1)
+        thisDatLon = matrix(nrow=11,ncol=1)
         timeSt = matrix(nrow=11,ncol=1)
         
         for (m in 1:nrow(HARPs)){ # for each HARP site
@@ -70,31 +73,41 @@ for (i in 1:length(var)){
           
           # grab covar values at this HARP site
           dat[m,1] = thisCovar[sitelon,sitelat,l]
-          coord[m] = list(c(lat[sitelat],lon[sitelon]))
+          thisDatLat[m] = lat[sitelat]
+          thisDatLon[m] = lon[sitelon]
           timeSt[m,1] = time[l]
         }
         
         # add data from this time stamp to array for this file
-        thisFile$Covar = cbind(thisFile$Covar,dat)
-        thisFile$Coords = cbind(thisFile$Coords,coord)
-        thisFile$Time = cbind(thisFile$Time,timeSt)
+        thisFile.Covar = cbind(thisFile.Covar,dat)
+        thisFile.Lat = cbind(thisFile.Lat,thisDatLat)
+        thisFile.Lon = cbind(thisFile.Lon,thisDatLon)
+        thisFile.Time = cbind(thisFile.Time,timeSt)
         
       }
       
       # add data points from all time stamps in this file to master data frame
-      masterData$Covar = cbind(masterData$Covar,thisFile$Covar)
-      masterData$Coords = cbind(masterData$Coords,thisFile$Coords)
-      masterData$Time = cbind(masterData$Time,thisFile$Time)
+      masterData.Covar = cbind(masterData.Covar,thisFile.Covar)
+      masterData.Lat = cbind(masterData.Lat,thisFile.Lat)
+      masterData.Lon = cbind(masterData.Lon,thisFile.Lon)
+      masterData.Time = cbind(masterData.Time,thisFile.Time)
       
       rm(thisCovar) # clear this variable to free up memory
       
     }
     
     # rename this variable with the covariate and depth in the name
-    assign(paste(var,depth[k],sep=""),masterData)
+    assign(paste(var,depth[k],'_data',sep=""),masterData.Covar)
+    assign(paste(var,depth[k],'_lat',sep=""),masterData.Lat)
+    assign(paste(var,depth[k],'_lon',sep=""),masterData.Lon)
+    assign(paste(var,depth[k],'_time',sep=""),masterData.Time)
     
     # save this depth dataframe 
-    action = paste("save(",paste(var[i],depth[k],sep=""),',file=',paste("'",inDir[i],'/',var[i],depth[k],'.Rdata',"'",sep=""),')',sep="")
+    action = paste("save(",paste(var,depth[k],'_data,',sep=""),
+                   paste(var,depth[k],'_lat,',sep=""),
+                   paste(var,depth[k],'_lon,',sep=""),
+                   paste(var,depth[k],'_time',sep=""),
+                   ',file=',paste("'",inDir[i],'/',var[i],depth[k],'.Rdata',"'",sep=""),')',sep="")
     eval(parse(text=action))
     
     # save(masterData,file=paste(inDir[i],'/',var[i],depth[k],'.Rdata',sep=""))
