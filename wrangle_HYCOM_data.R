@@ -3,7 +3,7 @@
 
 inDir = c("E:/ModelingCovarData/Temperature") # directory containing nc4 files
 var = c("water_temp") # must be given just as it appears in the HYCOM .nc4 files
-depth = list("_0m", "_50m", "_100m", "_200m", "_500m", "_1000m", "_3000m", "_4000m")
+depth = list("_0m", "_50m", "_100m", "_200m", "_500m", "_1000m", "_2000m" "_3000m", "_4000m")
 
 
 ######## Action -----------------
