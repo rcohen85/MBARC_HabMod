@@ -7,7 +7,9 @@ library(lubridate)
 inDir = c("J:/ModelingCovarData/Temperature") # directory containing nc4 files
 var = c("water_temp") # must be given just as it appears in the HYCOM .nc4 files
 depth = list("_0m", "_50m", "_100m", "_200m", "_500m", "_1000m", "_3000m", "_4000m")
-HAT_change = as_date('2017-05-01')
+
+# Only change these if using different sites
+HAT_change = as_date('2017-05-01') # account for change in HAT location from site A to B
 HARPs = t(data.frame(c(41.06165, -66.35155), # WAT_HZ
                      c(40.22999, -67.97798),  # WAT_OC
                      c(39.83295, -69.98194),  # WAT_NC
@@ -23,7 +25,7 @@ rownames(HARPs) = c("HZ","OC","NC","BC","WC","NFC","HAT","GS","BP","BS","JAX")
 
 ######## Action -----------------
 
-# need to convert Rdate to # hours since 2000-01-01 to compare to HYCOM time stamps
+# convert HAT_change Rdate to # hours since 2000-01-01 to compare to HYCOM time stamps
 dayShift = (interval(start='1970=01=01',end='2000-01-01')/ddays(x=1))
 dateOffset = (interval(start='1970-01-01',end=HAT_change)/ddays(x=1))-dayShift
 hourOffset = dateOffset*24
