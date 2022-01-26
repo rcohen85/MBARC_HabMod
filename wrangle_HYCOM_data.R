@@ -23,6 +23,7 @@ rownames(HARPs) = c("HZ","OC","NC","BC","WC","NFC","HAT","GS","BP","BS","JAX")
 
 ######## Action -----------------
 
+# need to convert Rdate to # hours since 2000-01-01 to compare to HYCOM time stamps
 dayShift = (interval(start='1970=01=01',end='2000-01-01')/ddays(x=1))
 dateOffset = (interval(start='1970-01-01',end=HAT_change)/ddays(x=1))-dayShift
 hourOffset = dateOffset*24
