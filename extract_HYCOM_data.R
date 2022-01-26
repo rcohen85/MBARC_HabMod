@@ -33,8 +33,8 @@ covars = c("water_temp")
 region <- c("global")
 
 # Enter date range(s) of interest in pairs of start/end dates
-dateS <- as.Date(c('2016-09-20')) # start date(s)
-dateE <- as.Date(c('2016-10-10')) # end date(s)
+dateS <- as.Date(c('2016-02-01')) # start date(s)
+dateE <- as.Date(c('2016-04-30 23:59:59')) # end date(s)
 
 # Enter study area boundaries in decimal degree lat/long limits
 latS <- c(24) # southern bound(s)
@@ -43,7 +43,7 @@ lonE <- c(-63) # eastern bound(s); use "-" for west of Prime Meridian
 lonW <- c(-82) # western bound(s); use "-" for west of Prime Meridian
 
 # SET AT LEAST ONE OF THESE TO NaN
-vertCoord = c(150) # Enter vertical layer(s) to grab (see available depths above) OR
+vertCoord = c(0, 4000) # Enter vertical layer(s) to grab (see available depths above) OR
 vertStride = NaN # Enter vertical stride (1 for all depth layers, 2 for every other, etc.)
 
 # Directory to save data; be sure to use forward slashes!
@@ -124,11 +124,11 @@ vertLayers = c(0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0,
                35.0, 40.0, 45.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0, 125.0, 150.0, 200.0, 250.0, 300.0, 350.0,
                400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0, 1250.0, 1500.0, 2000.0, 2500.0, 3000.0, 4000.0, 5000.0)
 
-for (i in 1:length(dateS)){ # for each set of dates
+for (l in 1:length(covars)){ # for each covariate
   
   for (k in 1:length(latS)){ # for each study area
     
-    for (l in 1:length(covars)){ # for each covariate
+    for (i in 1:length(dateS)){ # for each set of dates
       
       # Determine which experiment(s) to pull data from based on desired region & date range
       if (strcmp(region,"global")){
@@ -152,7 +152,7 @@ for (i in 1:length(dateS)){ # for each set of dates
       }
       
       
-      # Construct string containing relevant info on vars, region, period, etc.
+      # Construct string containing relevant info on var, region, period, etc.
       dlSpecs <- '?'
       # Add the variable
       dlSpecs = sprintf('%svar=%s&', dlSpecs, covars[l])
@@ -182,7 +182,7 @@ for (i in 1:length(dateS)){ # for each set of dates
             vertlb = sprintf('%sm',vertCoord[m]) 
             
             # Add the time range(s) and construct download url(s)
-            url[j] <- paste(url[j],sprintf('%stime_start=%s%%3A00%%3A00Z&time_end=%s%%3A00%%3A00Z&timeStride=1',
+            url <- paste(url,sprintf('%stime_start=%s%%3A00%%3A00Z&time_end=%s%%3A00%%3A00Z&timeStride=1',
                                            dlSpecs2, strftime(dateSubsetStarts[j], '%Y-%m-%dT00'),
                                            strftime(dateSubsetEnds[j], '%Y-%m-%dT00')),sep='')
             
@@ -193,7 +193,7 @@ for (i in 1:length(dateS)){ # for each set of dates
                                  covars[l],vertlb,saveDateS,saveDateE)
             
             # Download the data
-            curl_download(url[j], fileName, quiet=FALSE, mode="wb")
+            curl_download(url, fileName, quiet=FALSE, mode="wb")
           }
         } else { # If vertical stride was specified
           
