@@ -18,28 +18,28 @@
 # dir = directory of Google Drive MBARC_MarineCadastre
 
 #--------------------------------------------
-install.packages('swfscMisc')
+# install.packages('swfscMisc')
+# install.packages('dplyr')
+# install.packages('geosphere')
 library('swfscMisc')
-install.package('dplyr')
 library(dplyr)
-install.packages('geosphere')
 library('geosphere')
 library('ggplot2')
 
 # Specify the year you want to analyze
-year = '2015'
+year = '2016'
 
 # Specify the month you want to analyze
-month = '01'
+month = '05'
 
 # Specify the zone you want to analyze with TWO digits (example: 01, 12)
-zone = '11'
+zone = '19'
 
 # Specify the latitude and longitude of your site in decimal degrees
-site = c(34.247568, -120.025978)
+site = c(41.06165, -66.35155)
 
 # Specify the radius you would like to filter in
-radius = 10
+radius = 2
 
 #Specify Directory of MBARC_MarineCadastre (include backslash at end)
 dir = 'H:/Shared drives/MBARC_MarineCadastre/'
