@@ -1,32 +1,27 @@
-library(ncdf4)
-library(stringr)
-library(lubridate)
 
 ######## Settings ------------------
 
-inDir = c("J:/ModelingCovarData/Temperature") # directory containing nc4 files
+inDir = c("E:/ModelingCovarData/Temperature") # directory containing nc4 files
 var = c("water_temp") # must be given just as it appears in the HYCOM .nc4 files
-depth = list("_0m", "_50m", "_100m", "_200m", "_500m", "_1000m", "_3000m", "_4000m")
-HAT_change = as_date('2017-05-01')
+depth = list("_0m", "_50m", "_100m", "_200m", "_500m", "_1000m", "_2000m" "_3000m", "_4000m")
+
+
+######## Action -----------------
+library(ncdf4)
+library(stringr)
 HARPs = t(data.frame(c(41.06165, -66.35155), # WAT_HZ
                      c(40.22999, -67.97798),  # WAT_OC
                      c(39.83295, -69.98194),  # WAT_NC
                      c(39.19192, -72.22735),  # WAT_BC
                      c(38.37337, -73.36985),  # WAT_WC
                      c(37.16452, -74.46585),  # NFC
-                     c(35.30183,-74.8789,35.5841,-74.7499),  # HAT_A & HAT_B
+                     c(35.30183, -74.87895),  # HAT
                      c(33.66992, -75.9977),   # WAT_GS
                      c(32.10527, -77.09067),  # WAT_BP
                      c(30.58295, -77.39002),  # WAT_BS
                      c(30.27818, -80.22085)))  # JAX_D
 rownames(HARPs) = c("HZ","OC","NC","BC","WC","NFC","HAT","GS","BP","BS","JAX")
-
-######## Action -----------------
-
-# need to convert Rdate to # hours since 2000-01-01 to compare to HYCOM time stamps
-dayShift = (interval(start='1970=01=01',end='2000-01-01')/ddays(x=1))
-dateOffset = (interval(start='1970-01-01',end=HAT_change)/ddays(x=1))-dayShift
-hourOffset = dateOffset*24
+colnames(HARPs) = c("Lat","Lon")
 
 for (i in 1:length(var)){
   
@@ -49,6 +44,7 @@ for (i in 1:length(var)){
       # assemble file name
       ncfilename = paste(inDir[i],'/',allFiles[thisDepthInd[j]],sep="")
       ncin = nc_open(ncfilename)
+      # print(ncin)
       
       # load data
       thisCovar = ncvar_get(ncin,var[i]) 
@@ -72,18 +68,8 @@ for (i in 1:length(var)){
         for (m in 1:nrow(HARPs)){ # for each HARP site
           
           # find data points nearest this HARP site
-          if (m==7){ # at HAT, pull points first from site A, then from site B
-            if (time[l]<hourOffset){
-              sitelat = which.min(abs(HARPs[m,1]-lat))
-              sitelon = which.min(abs(HARPs[m,2]-lon))
-            } else {
-              sitelat = which.min(abs(HARPs[m,3]-lat))
-              sitelon = which.min(abs(HARPs[m,4]-lon))
-            }
-          } else {
           sitelat = which.min(abs(HARPs[m,1]-lat))
           sitelon = which.min(abs(HARPs[m,2]-lon))
-          }
           
           # grab covar values at this HARP site
           dat[m,1] = thisCovar[sitelon,sitelat,l]
