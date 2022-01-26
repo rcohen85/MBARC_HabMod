@@ -75,10 +75,6 @@ for (i in 1:length(fileList)){
 
 
 #CREATE CONTOUR PLOTS ---------------------------------------------------------------
-# x = unlist(lapply(HZ,c));y= unlist(lapply(HZ_time,c))
-# HZ_plot=as.data.frame(cbind(x,y))
-# HZ_plot=as.data.frame(cbind(HZ_plot,c(depths)))
-# colnames(HZ_plot) = c("Data","Time","Depth")
 
 z = as.vector(t(HZ[,1:2500]))
 x= as.vector(t(HZ_time[,1:2500]))
@@ -107,12 +103,18 @@ ggplot(smoothDat,aes(x=Time,y=Depth))+
   scale_y_reverse()
 
 
-# ggplot(HZ_plot_clean, aes(x=Time, y=Depth, z=Data)) + 
-#   geom_contour_filled() +
-#   scale_y_reverse() + 
-#   labs(x="Time", y="Depth (m)", title = "HYCOM_Temp") +
-#   theme(plot.title = element_text(hjust = 0.5)) +
-#   guides(fill = guide_legend(title = "Temperature (?C)"))
+
+x = unlist(lapply(HZ[,1:2500],c));y= unlist(lapply(HZ_time[,1:2500],c))
+HZ_plot=as.data.frame(cbind(x,y))
+HZ_plot=as.data.frame(cbind(HZ_plot,c(depths)))
+colnames(HZ_plot) = c("Data","Time","Depth")
+
+ggplot(HZ_plot, aes(x=Time, y=Depth, z=Data)) +
+  geom_contour_filled() +
+  scale_y_reverse() +
+  labs(x="Time", y="Depth (m)", title = "HYCOM_Temp") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  guides(fill = guide_legend(title = "Temperature (?C)"))
 
 
 
