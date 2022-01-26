@@ -1,9 +1,9 @@
 
 ######## Settings ------------------
 
-inDir = c("E:/ModelingCovarData/SSH") # directory containing nc4 files
-var = c("surf_el") # must be given just as it appears in the HYCOM .nc4 files
-depth = list("_0m", "_50m", "_100m", "_200m", "_500m", "_1000m", "_2000m", "_3000m", "_4000m")
+inDir = c("E:/ModelingCovarData/Temperature") # directory containing nc4 files
+var = c("water_temp") # must be given just as it appears in the HYCOM .nc4 files
+depth = list("_0m", "_50m", "_100m", "_200m", "_500m", "_1000m", "_2000m" "_3000m", "_4000m")
 
 
 ######## Action -----------------
@@ -15,7 +15,7 @@ HARPs = t(data.frame(c(41.06165, -66.35155), # WAT_HZ
                      c(39.19192, -72.22735),  # WAT_BC
                      c(38.37337, -73.36985),  # WAT_WC
                      c(37.16452, -74.46585),  # NFC
-                     c(35.5841, -74.7499),  # HAT
+                     c(35.30183, -74.87895),  # HAT
                      c(33.66992, -75.9977),   # WAT_GS
                      c(32.10527, -77.09067),  # WAT_BP
                      c(30.58295, -77.39002),  # WAT_BS

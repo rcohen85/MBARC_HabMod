@@ -33,8 +33,8 @@ covars = c("water_temp")
 region <- c("global")
 
 # Enter date range(s) of interest in pairs of start/end dates
-dateS <- as.Date(c('2016-02-01')) # start date(s)
-dateE <- as.Date(c('2016-04-30')) # end date(s)
+dateS <- as.Date(c('2016-09-20')) # start date(s)
+dateE <- as.Date(c('2016-10-10')) # end date(s)
 
 # Enter study area boundaries in decimal degree lat/long limits
 latS <- c(24) # southern bound(s)
@@ -43,11 +43,11 @@ lonE <- c(-63) # eastern bound(s); use "-" for west of Prime Meridian
 lonW <- c(-82) # western bound(s); use "-" for west of Prime Meridian
 
 # SET AT LEAST ONE OF THESE TO NaN
-vertCoord = c(2000) # Enter vertical layer(s) to grab (see available depths above) OR
+vertCoord = c(150) # Enter vertical layer(s) to grab (see available depths above) OR
 vertStride = NaN # Enter vertical stride (1 for all depth layers, 2 for every other, etc.)
 
 # Directory to save data; be sure to use forward slashes!
-saveDir = "E:/ModelingCovarData/V-Velocity"
+saveDir = "I:/DataScrapingCode/Test"
 
 
 # Action ------------------------------------------------------------------
@@ -182,8 +182,7 @@ for (i in 1:length(dateS)){ # for each set of dates
             vertlb = sprintf('%sm',vertCoord[m]) 
             
             # Add the time range(s) and construct download url(s)
-       
-                 url[j] <- paste(url[j],sprintf('%stime_start=%s%%3A00%%3A00Z&time_end=%s%%3A00%%3A00Z&timeStride=1',
+            url[j] <- paste(url[j],sprintf('%stime_start=%s%%3A00%%3A00Z&time_end=%s%%3A00%%3A00Z&timeStride=1',
                                            dlSpecs2, strftime(dateSubsetStarts[j], '%Y-%m-%dT00'),
                                            strftime(dateSubsetEnds[j], '%Y-%m-%dT00')),sep='')
             
