@@ -4,9 +4,8 @@ library(ncdf4)
 
 ######## Settings ------------------
 
-inDir = c("F:/AVISO_FLSEdata/2016") # directory containing nc4 files
-var = c('fsle') # must be given just as it appears in the Aviso .nc files
-#depth = list("_0m", "_50m", "_100m", "_200m", "_500m", "_1000m", "_2000m", "_3000m", "_4000m")
+inDir = c("E:/fsle/trunc") # directory containing .RData files
+sites = c('HZ','OC','NC','BC','WC','NFC','HAT','GS','BP','BS','JAX')
 
 # Only change these if using different sites
 HAT_change = as_date('2017-05-01') # account for change in HAT location from site A to B
@@ -21,118 +20,87 @@ HARPs = t(data.frame(c(41.06165, -66.35155), # WAT_HZ
                      c(32.10527, -77.09067),  # WAT_BP
                      c(30.58295, -77.39002),  # WAT_BS
                      c(30.27818, -80.22085)))  # JAX_D
-rownames(HARPs) = c("HZ","OC","NC","BC","WC","NFC","HAT","GS","BP","BS","JAX")
+rownames(HARPs) = sites
+colnames(HARPs) = c("Lat1", "Lon1", "Lat2", "Lon2")
 
 ######## Action -----------------
 
-# convert HAT_change Rdate to # hours since 2000-01-01 to compare to HYCOM time stamps
-dayShift = (interval(start='1970=01=01',end='2000-01-01')/ddays(x=1))
-dateOffset = (interval(start='1970-01-01',end=HAT_change)/ddays(x=1))-dayShift
-hourOffset = dateOffset*24
+fileList = dir(inDir,".Rdata")
 
-for (i in 1:length(var)){
+# initialize arrays to hold fsle data from all files matching sites
+masterData.Fsle = double()
+masterData.Lat = double()
+masterData.Lon = double()
+masterData.Time = double()
+
+for (i in 1:length(fileList)){
   
-  allFiles = list.files(path=inDir[i],pattern=".nc4") # list all files in given directory
-  #varFiles = allFiles[grep(var[i], allFiles)] # find file names containing given covar
+  # Load extracted RData files
+  load(paste(inDir,'/',fileList[i],sep=""))
   
-  for(k in 1:length(depth)) { # for each specified depth
+  lons = lons-360
+  
+  # get 6-digit datestamps from file names
+  fileDate = str_extract(fileList[i],"\\d\\d\\d\\d\\d\\d\\d\\d") 
+  time_temp = paste(str_sub(fileDate,start=1L,end=4L),'-',
+                    str_sub(fileDate,start=5L,end=6L),'-',
+                    str_sub(fileDate,start=7L,end=8L),sep="")
+  
+  time = as.Date(time_temp,format='%Y-%m-%d',tz="UTC")
+  
+  # # initialize arrays to hold relevant data points from this file
+  # thisFile.Fsle = double()
+  # thisFile.Lat = double()
+  # thisFile.Lon = double()
+  # thisFile.Time = double()
+ 
+  #for each file in fileList
+  fsle = matrix(nrow=11,ncol=1)
+  thisFsleLat = matrix(nrow=11,ncol=1)
+  thisFsleLon = matrix(nrow=11,ncol=1)
+  
+  for (m in 1:nrow(HARPs)){ # for each HARP site
     
-    # find files matching this depth
-    thisDepthInd = which(!is.na(str_match(allFiles,unlist(depth[k]))))
-    
-    # initialize arrays to hold data from all files matching this depth & covar
-    masterData.Covar = double()
-    masterData.Lat = double()
-    masterData.Lon = double()
-    masterData.Time = double()
-    
-    for (j in 1:length(thisDepthInd)){ # for each file matching this depth
-      
-      # assemble file name
-      ncfilename = paste(inDir[i],'/',allFiles[thisDepthInd[j]],sep="")
-      ncin = nc_open(ncfilename)
-      
-      # load data
-      thisCovar = ncvar_get(ncin,var) 
-      lat = ncvar_get(ncin,"lat")
-      lon = ncvar_get(ncin,"lon")
-      time = ncvar_get(ncin,"time") 
-      
-      # initialize arrays to hold relevant data points from this file
-      thisFile.Covar = double()
-      thisFile.Lat = double()
-      thisFile.Lon = double()
-      thisFile.Time = double()
-      
-      for (l in 1:length(time)){ # for each time stamp in this file
-        
-        dat = matrix(nrow=11,ncol=1)
-        thisDatLat = matrix(nrow=11,ncol=1)
-        thisDatLon = matrix(nrow=11,ncol=1)
-        timeSt = matrix(nrow=11,ncol=1)
-        
-        for (m in 1:nrow(HARPs)){ # for each HARP site
-          
-          # find data points nearest this HARP site
-          if (m==7){ # at HAT, pull points first from site A, then from site B
-            if (time[l]<hourOffset){
-              sitelat = which.min(abs(HARPs[m,1]-lat))
-              sitelon = which.min(abs(HARPs[m,2]-lon))
-            } else {
-              sitelat = which.min(abs(HARPs[m,3]-lat))
-              sitelon = which.min(abs(HARPs[m,4]-lon))
-            }
-          } else {
-            sitelat = which.min(abs(HARPs[m,1]-lat))
-            sitelon = which.min(abs(HARPs[m,2]-lon))
-          }
-          
-          # grab covar values at this HARP site
-          dat[m,1] = thisCovar[sitelon,sitelat,l]
-          thisDatLat[m] = lat[sitelat]
-          thisDatLon[m] = lon[sitelon]
-          timeSt[m,1] = time[l]
-        }
-        
-        # add data from this time stamp to array for this file
-        thisFile.Covar = cbind(thisFile.Covar,dat)
-        thisFile.Lat = cbind(thisFile.Lat,thisDatLat)
-        thisFile.Lon = cbind(thisFile.Lon,thisDatLon)
-        thisFile.Time = cbind(thisFile.Time,timeSt)
-        
+    # find data points nearest this HARP site
+    if (m==7){ # at HAT, pull points first from site A, then from site B
+      if (time<HAT_change){
+        sitelat = which.min(abs(HARPs[m,1]-lats))
+        sitelon = which.min(abs(HARPs[m,2]-lons))
+      } else {
+        sitelat = which.min(abs(HARPs[m,3]-lats))
+        sitelon = which.min(abs(HARPs[m,4]-lons))
       }
-      
-      # add data points from all time stamps in this file to master data frame
-      masterData.Covar = cbind(masterData.Covar,thisFile.Covar)
-      masterData.Lat = cbind(masterData.Lat,thisFile.Lat)
-      masterData.Lon = cbind(masterData.Lon,thisFile.Lon)
-      masterData.Time = cbind(masterData.Time,thisFile.Time)
-      
-      rm(thisCovar) # clear this variable to free up memory
-      
+    } else {
+      sitelat = which.min(abs(HARPs[m,1]-lats))
+      sitelon = which.min(abs(HARPs[m,2]-lons))
     }
     
-    # # rename this variable with the covariate and depth in the name
-    # assign(paste(var,depth[k],'_data',sep=""),masterData.Covar)
-    # assign(paste(var,depth[k],'_lat',sep=""),masterData.Lat)
-    # assign(paste(var,depth[k],'_lon',sep=""),masterData.Lon)
-    # assign(paste(var,depth[k],'_time',sep=""),masterData.Time)
-    # 
-    # # save this depth dataframe 
-    # action = paste("save(",paste(var,depth[k],'_data,',sep=""),
-    #                paste(var,depth[k],'_lat,',sep=""),
-    #                paste(var,depth[k],'_lon,',sep=""),
-    #                paste(var,depth[k],'_time',sep=""),
-    #                ',file=',paste("'",inDir[i],'/',var[i],depth[k],'.Rdata',"'",sep=""),')',sep="")
-    # eval(parse(text=action))
+    # grab fsle values at this HARP site
+    fsle[m,1] = fsle_max[sitelon,sitelat]
+    thisFsleLat[m] = lats[sitelat]
+    thisFsleLon[m] = lons[sitelon]
     
-    save(masterData.Covar,masterData.Lat,masterData.Lon,masterData.Time,
-         file=paste(inDir[i],'/',var[i],depth[k],'.Rdata',sep=""))
-    
-  } # move onto next depth
+  }
   
+  # # add data from each HARP site to array for this file
+  # thisFile.Fsle = cbind(thisFile.Fsle,fsle)
+  # thisFile.Lat = cbind(thisFile.Lat,thisFsleLat)
+  # thisFile.Lon = cbind(thisFile.Lon,thisFsleLon)
+  # thisFile.Time = times
+  
+  # add data points from all files to master data frame
+  masterData.Fsle = cbind(masterData.Fsle, fsle)
+  masterData.Lat = cbind(masterData.Lat,thisFsleLat)
+  masterData.Lon = cbind(masterData.Lon,thisFsleLon)
+  masterData.Time = cbind(masterData.Time,time)
   
 }
+
+
+
+save(masterData.Fsle,masterData.Lat,masterData.Lon,masterData.Time,
+   file=paste(inDir,'/','FSLE_TS.Rdata',sep=""))
+
 
 
 
