@@ -24,6 +24,10 @@
 # Also, when a specified date range spans more than one experiment, a separate file
 # will be downloaded with the data from each experiment falling within the date range.
 
+# NOTE: SCALING AND OFFSET FACTORS MUST BE APPLIED TO THE DATA VALUES; these can be
+# found in each .nc4 file, in the Attributes of each Variable. Data should be multiplied
+# by the scaling factor, and the the offset should be added.
+
 # SETTINGS ----------------------------------------------------------------
 
 # Enter covariate(s) of interest 
