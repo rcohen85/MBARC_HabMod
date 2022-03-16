@@ -2,16 +2,17 @@
 #downloaded AVISO FSLE data .nc files
 
 library(stringr)
+library(ncdf4)
 
-infolder = 'F:/AVISO_FLSEdata/2019/'
-outfolder = file.path('E:','fsle','trunc') #kind of a nuisance to write it this way, but different types of computers use different file separators, so in the long run it might be good?
+infolder = 'F:/AVISO_FLSEdata/2019'
+outfolder = file.path('E:/CovarShinyApp/Covars') #kind of a nuisance to write it this way, but different types of computers use different file separators, so in the long run it might be good?
 latrange = c(24,46)
 lonrange = c(-63,-82)
-timerange = c(as.Date('2019/01/1'),as.Date('2019/04/30'))
+timerange = c(as.Date('2016/05/1'),as.Date('2019/04/30'))
 
 ####--------------------------------------------
 
-allfiles = list.files(infolder,pattern = "*.nc",full.names = TRUE)
+allfiles = list.files(infolder,pattern = "*.nc",full.names = TRUE,recursive=TRUE)
 lonrange = 360+lonrange
 
 if (!dir.exists(outfolder)){
@@ -42,10 +43,10 @@ for (i in seq_along(allfiles)){
     #get lons
     lons_temp = ncvar_get(ncdata,"lon")
     #get other variables
-    theta_max_temp = ncvar_get(ncdata,"theta_max")
+    # theta_max_temp = ncvar_get(ncdata,"theta_max")
     # lon_bnds_temp = ncvar_get(ncdata,'lon_bnds')
     # lat_bnds_temp = ncvar_get(ncdata,'lat_bnds')
-    fsle_max_temp = ncvar_get(ncdata,'fsle_max')
+    data_temp = ncvar_get(ncdata,'fsle_max')
     # crs = ncvar_get(ncdata,'crs')
     
     #truncate lats/lons
@@ -57,14 +58,14 @@ for (i in seq_along(allfiles)){
     lons = as.numeric(lons_temp[lonsidx])
     # lat_bnds = as.numeric(lat_bnds_temp[latsidx])
     # lon_bnds = as.numeric(lon_bnds_temp[lonsidx])
-    theta_max = as.data.frame(t(theta_max_temp[lonsidx,latsidx]))
-    fsle_max = as.data.frame(t(fsle_max_temp[lonsidx,latsidx]))
+    # theta_max = as.data.frame(t(theta_max_temp[lonsidx,latsidx]))
+    data = as.data.frame(t(data_temp[lonsidx,latsidx]))
     
     #save stuff
     #get just the name of the file
-    tempname = read.table(text = allfiles[i],sep = '/')
-    usename = tempname[4]
-    usename = str_remove(usename,"_\\d\\d\\d\\d\\d\\d\\d\\d.nc")
+    # tempname = read.table(text = allfiles[i],sep = '/')
+    usename = "FSLE"
+    usename = paste(usename,"_0_",str_replace_all(times,"-",""),sep="")
     savename = file.path(outfolder,paste(usename,'.Rdata',sep=""))
     
     #set up data as dataframe
@@ -78,7 +79,7 @@ for (i in seq_along(allfiles)){
     
     #save data frame as .csv
     # write.csv(ncframe,savename)
-    save(lats,lons,theta_max,fsle_max,file=savename)
+    save(lats,lons,data,file=savename)
     
     print(paste('Done with file ',allfiles[i]))
   }
