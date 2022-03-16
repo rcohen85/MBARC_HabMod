@@ -24,7 +24,7 @@ install.package('dplyr')
 library(dplyr)
 install.packages('geosphere')
 library('geosphere')
-
+library('ggplot2')
 
 # Specify the year you want to analyze
 year = '2015'
@@ -42,7 +42,7 @@ site = c(34.247568, -120.025978)
 radius = 10
 
 #Specify Directory of MBARC_MarineCadastre (include backslash at end)
-dir = 'F:/Shared drives/MBARC_MarineCadastre/'
+dir = 'H:/Shared drives/MBARC_MarineCadastre/'
 
 #--------------------------------------------
 

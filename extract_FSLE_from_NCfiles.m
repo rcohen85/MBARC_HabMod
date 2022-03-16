@@ -6,8 +6,8 @@ clc
 
 infold = 'E:\ftp_test\2007'; %input folder of .nc fsle files downloaded from aviso using habMod_FSLE_from_AVISO.m
 outfold = 'E:\ftp_test\2007\trunc';
-latRange = [10,40]; %range of latitudes for truncated data
-lonRange = [180,250]; %range of longitudes for truncated data
+latRange = [24,46]; %range of latitudes for truncated data
+lonRange = [-63,-82]; %range of longitudes for truncated data
 timeRange = [datenum(2007,1,15,0,0,0),datenum(2007,10,1,0,0,0)]; %what date range do you care about
 inFSLE = dir(fullfile(infold,'*.nc'));
 

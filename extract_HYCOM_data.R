@@ -2,7 +2,7 @@
 # Pull ocean state estimate data from HYCOM for study area(s) and period(s) of interest.
 # Script will loop through every combination of input area(s) and period(s). Requested 
 # variables are downloaded individually, with separate files for each vertical layer. 
-# Must have pracma and curl packages installed.
+# Must have pracma, curl, and stringr packages installed.
 
 # Global data are available from 1994-01-01 through 2020-02-18; resolution is 1/12 degree;
 # covariates available are: surf_el, salinity, water_temp, water_u, water_v, salinity_bottom, 
@@ -18,23 +18,27 @@
 
 # Script is set to download data as netCDF4 with associated lat/lon coordinates
 
-# WARNING: When requesting all depth layers the data requests get real big! 
+# WARNING: When requesting all depth layers (vertStride=1) the data requests get real big! 
 # Attempting to download too much data returns an error ("HTTP error 400")
 # Try specifying a few depth layers to limit data size.
 # Also, when a specified date range spans more than one experiment, a separate file
 # will be downloaded with the data from each experiment falling within the date range.
 
+# NOTE: SCALING AND OFFSET FACTORS MUST BE APPLIED TO THE DATA VALUES; these can be
+# found in each .nc4 file, in the Attributes of each Variable. Data should be multiplied
+# by the scaling factor, and the the offset should be added.
+
 # SETTINGS ----------------------------------------------------------------
 
 # Enter covariate(s) of interest 
-covars = c("water_temp","salinity")
+covars = c("water_temp")
 
 # Enter regions of interest; "global" (1/12degree) OR "GoM" (1/25degree)
 region <- c("global")
 
 # Enter date range(s) of interest in pairs of start/end dates
-dateS <- as.Date(c('2016-09-20','2017-01-25')) # start date(s)
-dateE <- as.Date(c('2016-10-10','2017-02-10')) # end date(s)
+dateS <- as.Date(c('2016-02-01')) # start date(s)
+dateE <- as.Date(c('2016-09-30')) # end date(s)
 
 # Enter study area boundaries in decimal degree lat/long limits
 latS <- c(24) # southern bound(s)
@@ -43,21 +47,22 @@ lonE <- c(-63) # eastern bound(s); use "-" for west of Prime Meridian
 lonW <- c(-82) # western bound(s); use "-" for west of Prime Meridian
 
 # SET AT LEAST ONE OF THESE TO NaN
-vertCoord = c(1,20) # Enter vertical layer(s) to grab (e.g. 1 for 0.0m, see depths above) OR
+vertCoord = c(150) # Enter  depth of vertical layer(s) to grab (see available depths above) OR
 vertStride = NaN # Enter vertical stride (1 for all depth layers, 2 for every other, etc.)
 
 # Directory to save data; be sure to use forward slashes!
-saveDir = "I:/DataScrapingCode/Test"
+saveDir = "J:/DataScrapingCode/Test"
 
 
 # Action ------------------------------------------------------------------
 
 library(pracma)
 library(curl)
+library(stringr)
 
 # Check if save directory exists; if not, then create it
 dir.create(file.path(saveDir), recursive = TRUE, showWarnings = FALSE)
-setwd(saveDir)
+# setwd(saveDir)
 
 # Base urls and data dates for each experiment; note these dates do not reflect the true start/end
 # dates of the experiments, but are adjusted to eradicate temporal overlap between experiments
@@ -89,7 +94,7 @@ global_expts = data.frame(
         'http://ncss.hycom.org/thredds/ncss/GLBv0.08/expt_57.7',
         'http://ncss.hycom.org/thredds/ncss/GLBv0.08/expt_92.9',
         'http://ncss.hycom.org/thredds/ncss/GLBv0.08/expt_93.0',
-        'http://ncss.hycom.org/thredds/ncss/GLBv0.08/expt_93.0'), 
+        'http://ncss.hycom.org/thredds/ncss/GLBy0.08/expt_93.0'), 
   start=c(as.Date('1994-01-01'), as.Date('1995-01-01'), as.Date('1996-01-01'),
           as.Date('1997-01-01'), as.Date('1998-01-01'), as.Date('1999-01-01'),
           as.Date('2000-01-01'), as.Date('2001-01-01'), as.Date('2002-01-01'),
@@ -119,9 +124,9 @@ gom_expts = data.frame(
   start=c(as.Date('1993-01-01'), as.Date('2013-01-01'), as.Date('2014-09-01'), as.Date('2019-01-01')),
   end=c(as.Date('2012-12-31'), as.Date('2014-08-30'), as.Date('2018-12-31'), as.Date('2021-07-15')))
 
-vertLayers = c(0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0,
-               35.0, 40.0, 45.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0, 125.0, 150.0, 200.0, 250.0, 300.0, 350.0,
-               400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0, 1250.0, 1500.0, 2000.0, 2500.0, 3000.0, 4000.0, 5000.0)
+# vertLayers = c(0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0,
+#                35.0, 40.0, 45.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0, 125.0, 150.0, 200.0, 250.0, 300.0, 350.0,
+#                400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0, 1250.0, 1500.0, 2000.0, 2500.0, 3000.0, 4000.0, 5000.0)
 
 for (i in 1:length(dateS)){ # for each set of dates
   
@@ -176,8 +181,9 @@ for (i in 1:length(dateS)){ # for each set of dates
             url <- global_expts$url[idxRange]
             
             # Specify vertical layer
+            # layerID = which(vertLayers==vertCoord[m])
             dlSpecs2 = sprintf('%svertCoord=%s&', dlSpecs, vertCoord[m])
-            vertlb = sprintf('vertLayer_%s',vertLayers[vertCoord[m]]) 
+            vertlb = sprintf('%sm',vertCoord[m]) 
             
             # Add the time range(s) and construct download url(s)
             url[j] <- paste(url[j],sprintf('%stime_start=%s%%3A00%%3A00Z&time_end=%s%%3A00%%3A00Z&timeStride=1',
@@ -185,12 +191,12 @@ for (i in 1:length(dateS)){ # for each set of dates
                                            strftime(dateSubsetEnds[j], '%Y-%m-%dT00')),sep='')
             
             # Create file name to save data
-              fileName = sprintf('%s/HYCOM_%s_%s_%s_%s.nc4',saveDir,
-                                 covars[l],vertlb,dateSubsetStarts[j],dateSubsetEnds[j])
+            saveDateS = str_remove_all(dateSubsetStarts[j],'-')
+            saveDateE = str_remove_all(dateSubsetEnds[j],'-')
+            fileName = sprintf('%s/HYCOM_%s_%s_%s_%s.nc4',saveDir,
+                                 covars[l],vertlb,saveDateS,saveDateE)
             
             # Download the data
-            #download.file(url[j], fileName, quiet=FALSE)
-            #sprintf('Downloading %s data from %s',covars[l],url[j])
             curl_download(url[j], fileName, quiet=FALSE, mode="wb")
           }
         } else { # If vertical stride was specified
@@ -204,17 +210,12 @@ for (i in 1:length(dateS)){ # for each set of dates
                                          strftime(dateSubsetEnds[j], '%Y-%m-%dT00')),sep='')
           
           # Create file name to save data
-          if (length(url)>1){
-            fileName = sprintf('%s/HYCOM_%s_%s_%s_%s_%s.nc4',saveDir,
-                               covars[l],vertlb,dateSubsetStarts[j],dateSubsetEnds[j],j)
-          } else {
-            fileName = sprintf('%s/HYCOM_%s_%s_%s_%s.nc4',saveDir,
-                               covars[l],vertlb,dateSubsetStarts[j],dateSubsetEnds[j])
-          }
+          saveDateS = str_remove_all(dateSubsetStarts[j],'-')
+          saveDateE = str_remove_all(dateSubsetEnds[j],'-')
+          fileName = sprintf('%s/HYCOM_%s_%s_%s_%s.nc4',saveDir,
+                             covars[l],vertlb,saveDateS,saveDateE)
           
           # Download the data
-          #download.file(url[j], fileName, quiet=FALSE)
-          #sprintf('Downloading %s data from %s',covars[l],url[j])
           curl_download(url[j], fileName, quiet=FALSE, mode="wb")
           
         }
