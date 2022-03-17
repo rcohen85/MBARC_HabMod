@@ -1,5 +1,6 @@
 library(stringr)
 library(R.matlab)
+library(lubridate)
 
 infolder = 'E:/HYCOM/'
 outfolder = file.path('E:/CovarShinyApp/Covars')

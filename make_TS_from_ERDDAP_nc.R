@@ -1,5 +1,6 @@
 # Data wrangling script for downloaded ERDAP data
 # Start with downloaded .nc files, end with time series at each site
+# Also save a file for lat, lon, chlorophyll, for each date
 # Final data format is .Rdata
 
 library(stringr)
@@ -9,6 +10,7 @@ library(ncdf4)
 ## SETTINGS --------------------------------------------------------------------
 
 inDir = c("E:/ModelingCovarData/Chl") # directory containing .nc files
+outfolder = c("E:/CovarShinyApp/Covars")
 sites = c('HZ','OC','NC','BC','WC','NFC','HAT','GS','BP','BS','JAX')
 
 # Only change these if using different sites
@@ -31,13 +33,13 @@ fileList = list.files(inDir,pattern = "*.nc",full.names = TRUE,recursive=TRUE)
 
 ## ACTION ----------------------------------------------------------------------
 
-# initialize arrays to hold data from all files matching sites
-masterData.Chl = double()
+# initialize arrays to hold data from all points matching sites
+masterData.Data = double()
 masterData.Lat = double()
 masterData.Lon = double()
 masterData.Time = double()
 
-for (i in seq_along(fileList)){
+for (i in seq_along(fileList)){   #for each file in fileList
   
   # Open a given .nc file
   ncdata = nc_open(fileList[i])
@@ -55,9 +57,13 @@ for (i in seq_along(fileList)){
   
   # get longitude values from file
   lons = ncvar_get(ncdata, "longitude")
+  lons[lons<0] = lons[lons<0]+360
   
   # get chlorophyll values from file
-  chl = ncvar_get(ncdata, "chlor_a")
+  data = t(ncvar_get(ncdata, "chlor_a"))
+  
+  saveName = paste(outfolder,'/',"Chlorophyll_0_",fileDate,'.Rdata',sep="")
+  save(data,lats,lons,file=saveName)
   
   # # initialize arrays to hold relevant data points from this file
   # thisFile.Fsle = double()
@@ -65,8 +71,8 @@ for (i in seq_along(fileList)){
   # thisFile.Lon = double()
   # thisFile.Time = double()
   
-  #for each file in fileList
-  thisFileChl = matrix(nrow=11,ncol=1)
+
+  thisFileData = matrix(nrow=11,ncol=1)
   thisFileLat = matrix(nrow=11,ncol=1)
   thisFileLon = matrix(nrow=11,ncol=1)
   
@@ -87,7 +93,7 @@ for (i in seq_along(fileList)){
     }
     
     # grab fsle values at this HARP site
-    thisFileChl[m,1] = chl[sitelon,sitelat]
+    thisFileData[m,1] = data[sitelon,sitelat]
     thisFileLat[m] = lats[sitelat]
     thisFileLon[m] = lons[sitelon]
     
@@ -99,8 +105,8 @@ for (i in seq_along(fileList)){
   # thisFile.Lon = cbind(thisFile.Lon,thisFsleLon)
   # thisFile.Time = times
   
-  # add data points from all files to master data frame
-  masterData.Chl = cbind(masterData.Chl, thisFileChl)
+  # add HARP site data points from each file to master data frame
+  masterData.Data = cbind(masterData.Data, thisFileData)
   masterData.Lat = cbind(masterData.Lat,thisFileLat)
   masterData.Lon = cbind(masterData.Lon,thisFileLon)
   masterData.Time = cbind(masterData.Time,thisFileTime)
@@ -109,5 +115,5 @@ for (i in seq_along(fileList)){
 
 
 
-save(masterData.Chl,masterData.Lat,masterData.Lon,masterData.Time,
+save(masterData.Data,masterData.Lat,masterData.Lon,masterData.Time,
      file=paste(inDir,'/','Chl_TS.Rdata',sep=""))
