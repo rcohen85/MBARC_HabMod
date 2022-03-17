@@ -9,8 +9,8 @@ library(ncdf4)
 
 ## SETTINGS --------------------------------------------------------------------
 
-inDir = c("E:/ModelingCovarData/Chl") # directory containing .nc files
-outfolder = c("E:/CovarShinyApp/Covars")
+inDir = "E:/ModelingCovarData/Chl" # directory containing .nc files
+outfolder = "E:/CovarShinyApp/Covars"
 sites = c('HZ','OC','NC','BC','WC','NFC','HAT','GS','BP','BS','JAX')
 
 # Only change these if using different sites
@@ -57,7 +57,8 @@ for (i in seq_along(fileList)){   #for each file in fileList
   
   # get longitude values from file
   lons = ncvar_get(ncdata, "longitude")
-  lons[lons<0] = lons[lons<0]+360
+  # convert from [-180 180] to [0 360] to be consistent with other covars
+  lons[lons<0] = lons[lons<0]+360 
   
   # get chlorophyll values from file
   data = t(ncvar_get(ncdata, "chlor_a"))
@@ -82,14 +83,14 @@ for (i in seq_along(fileList)){   #for each file in fileList
     if (m==7){ # at HAT, pull points first from site A, then from site B
       if (thisFileTime<HAT_change){
         sitelat = which.min(abs(HARPs[m,1]-lats))
-        sitelon = which.min(abs(HARPs[m,2]-lons))
+        sitelon = which.min(abs((HARPs[m,2]+360)-lons))
       } else {
         sitelat = which.min(abs(HARPs[m,3]-lats))
-        sitelon = which.min(abs(HARPs[m,4]-lons))
+        sitelon = which.min(abs((HARPs[m,4]+360)-lons))
       }
     } else {
       sitelat = which.min(abs(HARPs[m,1]-lats))
-      sitelon = which.min(abs(HARPs[m,2]-lons))
+      sitelon = which.min(abs((HARPs[m,2]+360)-lons))
     }
     
     # grab fsle values at this HARP site
