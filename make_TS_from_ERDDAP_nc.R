@@ -1,6 +1,6 @@
-# Data wrangling script for downloaded ERDAP data
+# Data wrangling script for downloaded ERDDAP data
 # Start with downloaded .nc files, end with time series at each site
-# Also save a file for lat, lon, chlorophyll, for each date
+# Also save a file for lat, lon, chlorophyll grid, for each date
 # Final data format is .Rdata
 
 library(stringr)
@@ -34,7 +34,7 @@ fileList = list.files(inDir,pattern = "*.nc",full.names = TRUE,recursive=TRUE)
 ## ACTION ----------------------------------------------------------------------
 
 # initialize arrays to hold data from all points matching sites
-masterData.Data = double()
+masterData.Chl = double()
 masterData.Lat = double()
 masterData.Lon = double()
 masterData.Time = double()
@@ -107,7 +107,7 @@ for (i in seq_along(fileList)){   #for each file in fileList
   # thisFile.Time = times
   
   # add HARP site data points from each file to master data frame
-  masterData.Data = cbind(masterData.Data, thisFileData)
+  masterData.Chl = cbind(masterData.Chl, thisFileData)
   masterData.Lat = cbind(masterData.Lat,thisFileLat)
   masterData.Lon = cbind(masterData.Lon,thisFileLon)
   masterData.Time = cbind(masterData.Time,thisFileTime)
@@ -116,5 +116,5 @@ for (i in seq_along(fileList)){   #for each file in fileList
 
 
 
-save(masterData.Data,masterData.Lat,masterData.Lon,masterData.Time,
+save(masterData.Chl,masterData.Lat,masterData.Lon,masterData.Time,
      file=paste(inDir,'/','Chl_TS.Rdata',sep=""))
