@@ -4,6 +4,7 @@
 # (-82,-63)
 
 library(stringr)
+library(curl)
 
 url1 = 'https://coastwatch.pfeg.noaa.gov/erddap/griddap/pmlEsaCCI50OceanColorDaily.nc?chlor_a%5B('
 url2 = 'T00:00:00Z):1:('
@@ -16,7 +17,7 @@ allDates = seq.Date(dateS,dateE,by=1)
 
 for (i in 1:length(allDates)){
   fullURL = paste(url1,strftime(allDates[i]),url2,strftime(allDates[i]),url3,sep="")
-  saveName = paste('J:/Chpt_3/Chla/Chl_',str_replace_all(strftime(allDates[i]),'-',''),'.nc',sep="")
+  saveName = paste('E:/ModelingCovarData/Chl',str_replace_all(strftime(allDates[i]),'-',''),'.nc',sep="")
   
   curl_download(fullURL,saveName,quiet=FALSE,mode="wb")
 }
