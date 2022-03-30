@@ -52,14 +52,12 @@ for (i in seq_along(fileList)){   #for each file in fileList
   thisFileTime = as.Date(time_temp,format='%Y-%m-%d',tz="UTC")
   
   # Find the column closest to setLon
-  lons = lons-365
-  colDiff = abs(lons-setLon)
-  colInd = which(colDiff==min(colDiff))
+  lons = lons-360
+  colInd = which.min(abs(lons-setLon))
   closeLon = lons[colInd]
   
   # Calculate the first difference of SSH values at column matching closeLon
-  firstDiff = diff(data[,colInd], lag = 1)
-  maxDiffInd = which(firstDiff==max(firstDiff))
+  maxDiffInd = which.max(diff(data[,colInd], lag = 1))
   
   # Get the corresponding latitude
   maxDiffLat = lats[maxDiffInd]
@@ -86,7 +84,6 @@ for (i in seq_along(fileList)){   #for each file in fileList
     colnames(HARPcoords) = c("latitude", "longitude")
     # calculate geodesic distance in m
     geoDist = data.frame(geodist(frontalCoord, HARPcoords, paired=TRUE, measure="geodesic"))
-    #FIGURE THIS ONE OUT
   }
   if (thisFileTime>HAT_change & thisFileTime>OC_change) {
     frontalLats = rep(maxDiffLat, times = 11)
