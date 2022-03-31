@@ -9,7 +9,7 @@ library(stringr)
 inDir = 'E:/hycom/0.08deg'
 outDir = 'E:/hycom'
 sites = c('HZ','OC','NC','BC','WC','NFC','HAT','GS','BP','BS','JAX')
-setLon = as.numeric(-74.5)
+setLon = as.numeric(-72.5)
 
 #HARP Sites
 OC_change = as_date('2018-05-01') # account for change in
@@ -60,7 +60,7 @@ for (i in seq_along(fileList)){   #for each file in fileList
   maxDiffInd = which.max(diff(data[,colInd], lag = 1))
   
   # Get the corresponding latitude
-  maxDiffLat = lats[maxDiffInd]
+  maxDiffLat = lats[maxDiffInd+1]
   # Add to master data frame
   masterData.Frontal = cbind(masterData.Frontal, maxDiffLat)
   
