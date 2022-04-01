@@ -9,7 +9,7 @@ library(stringr)
 inDir = 'E:/hycom/0.08deg'
 outDir = 'E:/hycom'
 sites = c('HZ','OC','NC','BC','WC','NFC','HAT','GS','BP','BS','JAX')
-setLon = as.numeric(-72.5)
+setLon = -74.5
 
 #HARP Sites
 OC_change = as_date('2018-05-01') # account for change in
@@ -53,20 +53,27 @@ for (i in seq_along(fileList)){   #for each file in fileList
   
   # Find the column closest to setLon
   lons = lons-360
+  # Adjust lats to remove those that are over land
+  # 160 is for -75 setLon
+  # lats = lats[1:160]
+  # data = data[1:160,]
   colInd = which.min(abs(lons-setLon))
   closeLon = lons[colInd]
   
   # Calculate the first difference of SSH values at column matching closeLon
-  maxDiffInd = which.max(diff(data[,colInd], lag = 1))
+  minDiffInd = which.min(diff(data[,colInd], lag = 1))
+  # Make plots of first difference for each file
+  # firstDiff = diff(data[,colInd], lag=1)
+  # plot(firstDiff)
   
-  # Get the corresponding latitude
-  maxDiffLat = lats[maxDiffInd+1]
+  # Get the corresponding latitude (gives the last point still in GS)
+  minDiffLat = lats[minDiffInd]
   # Add to master data frame
-  masterData.Frontal = cbind(masterData.Frontal, maxDiffLat)
+  masterData.Frontal = cbind(masterData.Frontal, minDiffLat)
   
   # Calculate the geodesic distance from HARP site to lat/lon of maxDiff
   if (thisFileTime<HAT_change) {
-    frontalLats = rep(maxDiffLat, times = 11)
+    frontalLats = rep(minDiffLat, times = 11)
     frontalLons = rep(closeLon, times = 11)
     frontalCoord = t(rbind(frontalLats, frontalLons))
     colnames(frontalCoord) = c("latitude", 'longitude')
@@ -74,9 +81,13 @@ for (i in seq_along(fileList)){   #for each file in fileList
     colnames(HARPcoords) = c("latitude", "longitude")
     # calculate geodesic distance in m
     geoDist = geodist(frontalCoord, HARPcoords, paired=TRUE, measure="geodesic")
+    geoDist = geoDist/1000
+    latOffset = HARPcoords[,1]-frontalCoord[,1]
+    southInd = which(latOffset<0)
+    geoDist[southInd] = geoDist[southInd]*(-1)
   }
   if (thisFileTime>HAT_change & thisFileTime<OC_change) {
-    frontalLats = rep(maxDiffLat, times = 11)
+    frontalLats = rep(minDiffLat, times = 11)
     frontalLons = rep(closeLon, times = 11)
     frontalCoord = t(rbind(frontalLats, frontalLons))
     colnames(frontalCoord) = c("latitude", 'longitude')
@@ -84,9 +95,13 @@ for (i in seq_along(fileList)){   #for each file in fileList
     colnames(HARPcoords) = c("latitude", "longitude")
     # calculate geodesic distance in m
     geoDist = data.frame(geodist(frontalCoord, HARPcoords, paired=TRUE, measure="geodesic"))
+    geoDist = geoDist/1000
+    latOffset = HARPcoords[,1]-frontalCoord[,1]
+    southInd = which(latOffset<0)
+    geoDist[southInd] = geoDist[southInd]*(-1)
   }
   if (thisFileTime>HAT_change & thisFileTime>OC_change) {
-    frontalLats = rep(maxDiffLat, times = 11)
+    frontalLats = rep(minDiffLat, times = 11)
     frontalLons = rep(closeLon, times = 11)
     frontalCoord = t(rbind(frontalLats, frontalLons))
     colnames(frontalCoord) = c("latitude", 'longitude')
@@ -94,6 +109,10 @@ for (i in seq_along(fileList)){   #for each file in fileList
     colnames(HARPcoords) = c("latitude", "longitude")
     # calculate geodesic distance in m
     geoDist = data.frame(geodist(frontalCoord, HARPcoords, paired=TRUE, measure="geodesic"))
+    geoDist = geoDist/1000
+    latOffset = HARPcoords[,1]-frontalCoord[,1]
+    southInd = which(latOffset<0)
+    geoDist[southInd] = geoDist[southInd]*(-1)
   }
   # Add geodist to master data frame
   masterData.GeoDist = cbind(masterData.GeoDist, geoDist)
@@ -105,5 +124,5 @@ for (i in seq_along(fileList)){   #for each file in fileList
 
 # Save TS
 save(masterData.GeoDist,masterData.Frontal,masterData.Time,
-     file=paste(outDir,'/','GeoDist_TS.Rdata',sep=""))
+     file=paste(outDir,'/','GeoDist_',setLon,'_TS.Rdata',sep=""))
 
